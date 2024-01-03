@@ -1,0 +1,3 @@
+repository: ../neo-sophia
+db_path: .database/
+
