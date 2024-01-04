@@ -1,8 +1,16 @@
 """
 Wrappers for OpenAI API.
+
+The following data structures very closely mirror those required by the
+OpenAI API.
+- `ToolCall` encapsulates tool calling parameters.  These are created by the
+  assistant/LLM.
+- `ToolMessage` is a message representing the response from a tool call.
+- `{User|System|Assistant}Message` objects are messages with associated rules
+  and contents.  `AssistantMessage` may also hold `ToolCall`s.
 """
 
-from typing import Any, List, Callable, Optional
+from typing import Any, Callable
 import os
 import sys
 from dataclasses import dataclass
@@ -97,7 +105,7 @@ def embeddings_tensor(client: oai.Client, texts: list[str]) -> torch.Tensor:
 
 
 def toolcall_to_dict(tool_call: ToolCall) -> dict:
-    """Convert a ToolCall to a dict."""
+    """Convert a ToolCall to a dict that can be embedded in an API message."""
     return {
         'id': tool_call.tool_call_id,
         'type': 'function',
@@ -108,7 +116,7 @@ def toolcall_to_dict(tool_call: ToolCall) -> dict:
     }
 
 def message_to_dict(message: Message) -> dict:
-    """Convert a message to a dict.
+    """Convert a message to a dict that can be passed to the API.
 
     This is much, much faster than the built in dataclasses.asdict function."""
 
@@ -117,8 +125,8 @@ def message_to_dict(message: Message) -> dict:
         if value is None:
             continue
 
+        # Handle lists of tools calls in messages
         if isinstance(value, list):
-            # There are sometimes lists of messages w/in messages
             output_dict[key] = [
                 vi if not isinstance(vi, ToolCall) else toolcall_to_dict(vi)
                 for vi in value
@@ -165,15 +173,15 @@ def start_chat(model: str, api_key: str) -> Callable:
     def chat_func(messages: list[Message], *args, **kwargs) -> Message:
         input_messages = [message_to_dict(message) for message in messages]
         print(input_messages)
-        # try:
-        response = client.chat.completions.create(
-            messages=input_messages,
-            model=model,
-            *args,
-            **kwargs
-        )
-        return message_from_api_response(response)
-        # except oai.APIError:
-        #     return UserMessage('There was an API error.  Please try again.')
+        try:
+            response = client.chat.completions.create(
+                messages=input_messages,
+                model=model,
+                *args,
+                **kwargs
+            )
+            return message_from_api_response(response)
+        except oai.APIError:
+            return UserMessage('There was an API error.  Please try again.')
 
     return chat_func

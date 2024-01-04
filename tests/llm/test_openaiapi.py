@@ -10,6 +10,7 @@ import json
 
 from groundcrew.llm import openaiapi
 
+
 @pytest.fixture
 def openai_chat_response():
     def _chat_output(content, role):
@@ -102,6 +103,25 @@ def openai_tool_response():
 #     assert res.shape == (n_texts, openaiapi.EMBEDDING_DIM_DEFAULT)
 
 
+def test_toolcall_to_dict():
+    toolcall = openaiapi.ToolCall(
+        'tcid',
+        'function',
+        'func_name',
+        {
+            'arg1': 42,
+            'arg2': 'forty two'
+        }
+    )
+    toolcall_dict = openaiapi.toolcall_to_dict(toolcall)
+    assert toolcall_dict['id']=='tcid'
+    assert toolcall_dict['type']=='function'
+    assert toolcall_dict['function']=={
+        'name': 'func_name',
+        'arguments': '{"arg1": 42, "arg2": "forty two"}'
+    }
+
+
 def test_message_to_dict():
     message = openaiapi.UserMessage('This is a test.')
     message_dict = openaiapi.message_to_dict(message)
@@ -129,6 +149,7 @@ def test_message_to_dict():
             'arguments': '{"arg1": 42}'
         }
     }]
+
 
 @patch('groundcrew.llm.openaiapi.oai.resources.chat.completions.Completions.create')
 def test_chat_completion(chat_mock, openai_chat_response, openai_tool_response):
