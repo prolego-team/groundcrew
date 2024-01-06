@@ -12,6 +12,8 @@ from groundcrew.constants import DEFAULT_EF
 
 opj = os.path.join
 
+DEFAULT_COLLECTION_NAME = 'database'
+
 
 def get_committed_files(
         repository_dir: str, extensions: List[str]) -> List[str]:
@@ -91,8 +93,7 @@ def init_db(client, repository):
     files = [x.split(os.path.abspath(repository))[1][1:] for x in files]
 
     collection = client.get_or_create_collection(
-        name='database', embedding_function=DEFAULT_EF
+        name=DEFAULT_COLLECTION_NAME, embedding_function=DEFAULT_EF
     )
 
     return collection, files
-
