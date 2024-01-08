@@ -93,9 +93,18 @@ def run_suite(suite: Dict, eval_funcs_dict, collection, llm, tools_dict) -> None
     print('~~~~ ~~~~ ~~~~ ~~~~')
 
 
-def match_word_any(text: str, words: List[str]) -> bool:
-    """check if words in text match one or more of a list of words"""
+def match_word_any(text: str, words: List[str], strip_quotes: bool) -> bool:
+    """
+    Check if words in text match one or more of a list of words.
+    Optionally strip quotes, which is useful for checking keywords
+    like function names where the LLM will probably surround them
+    with some type of quote.
+    """
+    quote_types_to_strip = '\'"`'
+
     text_words = re.split('\\s+', text)
+    if strip_quotes:
+        words = [x.strip(quote_types_to_strip) for x in text_words]
     for word in words:
         if word in text_words:
             return True
