@@ -1,3 +1,7 @@
 repository: ../neo-sophia
 db_path: .database/
 cache_dir: .cache/
+Tools:
+  - module: groundcrew.tools
+    tools:
+      - CodebaseQATool

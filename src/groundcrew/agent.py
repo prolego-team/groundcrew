@@ -1,9 +1,7 @@
 """
 """
-import chromadb
-
-from chromadb.utils import embedding_functions
-from groundcrew.tools import codebase_qa
+from groundcrew import system_prompts as sp
+from groundcrew.tools import CodebaseQATool
 
 
 class Agent:
@@ -20,6 +18,9 @@ class Agent:
 
     def run(self):
 
+        codebase_qa_tool = CodebaseQATool(
+            sp.CODEBASE_QA_PROMPT, self.collection, self.llm)
+
         while True:
 
             base_prompt = 'Choose the correct tool to answer the following question.'
@@ -28,7 +29,9 @@ class Agent:
             if not prompt:
                 prompt = 'What is the name of the function that finds pdfs in a directory?'
 
-            response = codebase_qa(prompt, self.collection, self.llm)
+            #response = codebase_qa(prompt, self.collection, self.llm, False)
+
+            response = codebase_qa_tool(prompt, include_code=True)
 
             print(response)
             print('\n', 80 * '*', '\n')

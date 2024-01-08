@@ -13,8 +13,34 @@ from groundcrew.constants import DEFAULT_EF
 opj = os.path.join
 
 
+def format_chunk(chunk, include_text):
+
+    # TODO - change Document based on chunk type
+    # TODO - start and end lines won't be needed if typ is a file
+
+    prompt = f'Name: {chunk.name}\n'
+    prompt += f'Type: {chunk.typ}\n'
+    if include_text:
+        prompt += f'Full Text: {chunk.text}\n'
+    prompt += f'Document: {chunk.document}\n'
+    prompt += f'Start Line: {chunk.start_line}\n'
+    prompt += f'End Line: {chunk.end_line}\n'
+    return prompt
+
+
 def get_committed_files(
         repository_dir: str, extensions: List[str]) -> List[str]:
+    """
+    This function finds all files in a directory and filters out those not
+    committed to the repository
+
+    Args:
+        repository_dir: str
+        extensions: List[str]
+
+    Returns:
+        List[str]
+    """
 
     committed_files = set()
     repo = Repo(repository_dir)

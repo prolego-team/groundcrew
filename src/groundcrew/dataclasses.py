@@ -1,5 +1,7 @@
 """
 """
+from typing import Callable
+
 from dataclasses import dataclass
 
 
@@ -8,11 +10,14 @@ class Config:
     repository: str
     db_path: str
     cache_dir: str
+    Tools: [str]
 
 
 @dataclass
 class Chunk:
     """
+    Class to hold text data such as a python function, text file, etc.
+
     if typ is 'function':
         document is the function description
         text is the function code
@@ -31,3 +36,17 @@ class Chunk:
     end_line: int
 
 
+@dataclass
+class Tool:
+    """
+    Class to hold a Tool which is a Python function that the agent can use
+    """
+    name: str
+    function_str: str
+    description: str
+    call: Callable
+
+    def to_string(self):
+        output = f'\nTool Name: {self.name}\n'
+        output += f'Description: {self.description}\n'
+        return output

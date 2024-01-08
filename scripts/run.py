@@ -10,32 +10,13 @@ import click
 
 import chromadb
 
-from openai import OpenAI
-
+from groundcrew import utils
 from groundcrew.code import (extract_python_functions_from_file,
                              generate_function_descriptions, init_db)
 from groundcrew.agent import Agent
 from groundcrew.dataclasses import Config
 
 opj = os.path.join
-
-
-def build_llm_client(model):
-
-    if 'gpt' in model:
-        client = OpenAI()
-
-        def chat_complete(prompt):
-            complete = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return complete.choices[0].message.content
-
-    return chat_complete
 
 
 def populate_db(
@@ -101,6 +82,12 @@ def main(config, model):
     # Directory to store generated file and function descriptions
     os.makedirs(config.cache_dir, exist_ok=True)
 
+    # Load or generate Tools
+    tools_filepath = opj(config.cache_dir, 'tools.yaml')
+    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
+    tools = utils.setup_tools(config.Tools, tool_descriptions)
+    #utils.save_tools_to_yaml(tools, tools_filepath)
+
     # Create the chromadb client
     client = chromadb.PersistentClient(config.db_path)
 
@@ -108,7 +95,7 @@ def main(config, model):
     collection, files = init_db(client, config.repository)
 
     # LLM that takes a string as input and returns a string
-    llm = build_llm_client(model)
+    llm = utils.build_llm_client(model)
 
     # File for storing LLM generated descriptions
     function_descriptions_file = opj(
