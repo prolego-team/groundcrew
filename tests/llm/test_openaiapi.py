@@ -102,16 +102,18 @@ def openai_embedding_response():
 
     return _embedding_response
 
+
 @patch('groundcrew.llm.openaiapi.openai.resources.embeddings.Embeddings.create')
-def test_embeddings_tensor(embeddings_mock, openai_embedding_response):
-    """test `embeddings_tensor` and `extract_embeddings` functions"""
+def test_embeddings(embeddings_mock, openai_embedding_response):
+    """test embedding functions"""
     n_texts = 3
     embedding_dim = 10
 
     embeddings_mock.return_value = openai_embedding_response(n_texts, embedding_dim)
     texts = ['baloney'] * n_texts
 
-    embedding_func = openaiapi.get_embedding_model('fake_model', 'fake_api_key')
+    client = openaiapi.get_openaiai_client('fake_api_key')
+    embedding_func = openaiapi.get_embedding_model('fake_model', client)
     results = embedding_func(texts)
 
     assert len(results)==len(texts)
@@ -130,11 +132,13 @@ def test_toolcall_to_dict():
         }
     )
     toolcall_dict = openaiapi.toolcall_to_dict(toolcall)
-    assert toolcall_dict['id']=='tcid'
-    assert toolcall_dict['type']=='function'
-    assert toolcall_dict['function']=={
-        'name': 'func_name',
-        'arguments': '{"arg1": 42, "arg2": "forty two"}'
+    assert toolcall_dict=={
+        'id': 'tcid',
+        'type': 'function',
+        'function': {
+            'name': 'func_name',
+            'arguments': '{"arg1": 42, "arg2": "forty two"}'
+        }
     }
 
 
@@ -175,7 +179,8 @@ def test_chat_completion(chat_mock, openai_chat_response, openai_tool_response):
         target_output_content,
         target_output_role
     )
-    model = openaiapi.start_chat('test_model', 'fake_api_key')
+    client = openaiapi.get_openaiai_client('fake_api_key')
+    model = openaiapi.start_chat('test_model', client)
     messages = [
         openaiapi.SystemMessage('You are a helpful assistant.'),
         openaiapi.UserMessage('Knock knock.')
@@ -193,13 +198,18 @@ def test_chat_completion(chat_mock, openai_chat_response, openai_tool_response):
         target_output_function_name,
         target_output_function_args
     )
-    model = openaiapi.start_chat('test_model', 'fake_api_key')
+    model = openaiapi.start_chat('test_model', client)
     messages = [
         openaiapi.SystemMessage('You are a helpful assistant.'),
         openaiapi.UserMessage('Knock knock.')
     ]
     response = model(messages)
-    assert response.content==target_output_content
-    assert response.role==target_output_role
-    assert response.tool_calls[0].function_name==target_output_function_name
-    assert response.tool_calls[0].function_args==json.loads(target_output_function_args)
+    assert response==openaiapi.AssistantMessage(
+        target_output_content,
+        [openaiapi.ToolCall(
+            'some_string',
+            'function',
+            target_output_function_name,
+            json.loads(target_output_function_args))
+        ]
+    )

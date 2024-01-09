@@ -13,13 +13,25 @@ Example Usage:
 
 import groundcrew.llm.openaiapi as oai
 
-# Embeddings
-embedding_model = oai.get_embedding_model("text-embedding-ada-002", openai_key)
-embeddings = embedding_model(['This is a test', 'This is only a test'])
+with open('openai_key_file', 'r') as f:
+    openai_key = f.read().strip()
 
-# Chat
+client = oai.get_openaiai_client(openai_key)
+
+
+embedding_model = oai.get_embedding_model("text-embedding-ada-002", client)
+e = embedding_model(['This is a test', 'This is only a test'])
+print(type(e), len(e), type(e[0][0]))
+
+
 def dictionary(word):
-    ...
+    if word=='hacktophant':
+        return 'A hacker that is also a sycophant.'
+    elif word=='plasopyrus':
+        return 'A hard substance found on the inner lining of a platypus bill.'
+    else:
+        return 'I do not know!'
+
 
 function_descriptions = [
     {
@@ -40,7 +52,8 @@ function_descriptions = [
 tools = [{'type':'function', 'function':func} for func in function_descriptions]
 tool_functions = {'dictionary': dictionary}
 
-chat = oai.start_chat('gpt-4-1106-preview', openai_key)
+model = 'gpt-4-1106-preview'
+chat = oai.start_chat(model, client)
 
 messages = [
     oai.SystemMessage(
@@ -54,18 +67,19 @@ response = chat(
     tools=tools
 )
 messages.append(response)
+print(response)
 
 if response.tool_calls is not None:
     tool_output_messages = [
-        oai.message_from_tool_call(
-            tool.tool_call_id,
-            tool_functions[tool.function_name](**tool.function_args)
-        )
+        oai.ToolMessage(
+            str(tool_functions[tool.function_name](**tool.function_args)),
+            tool.tool_call_id)
         for tool in response.tool_calls
     ]
     messages += tool_output_messages
 
-final_response = chat(messages, tools=tools)
+response = chat(messages, tools=tools)
+print(response)
 """
 
 from typing import Any, Callable, Iterable
@@ -75,7 +89,7 @@ import json
 import openai
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolCall:
     tool_call_id: str
     tool_type: str
@@ -83,26 +97,26 @@ class ToolCall:
     function_args: dict
 
 
-@dataclass
+@dataclass(frozen=True)
 class SystemMessage:
     content: str
     role: str = 'system'
 
 
-@dataclass
+@dataclass(frozen=True)
 class UserMessage:
     content: str
     role: str = 'user'
 
 
-@dataclass
+@dataclass(frozen=True)
 class AssistantMessage:
     content: str
     tool_calls: list[ToolCall] | None
     role: str = 'assistant'
 
 
-@dataclass
+@dataclass(frozen=True)
 class ToolMessage:
     content: str | None
     tool_call_id: str
@@ -135,16 +149,13 @@ def message_to_dict(message: Message) -> dict:
     This is much, much faster than the built in dataclasses.asdict function."""
 
     output_dict = {}
-    for key,value in vars(message).items():
+    for key, value in vars(message).items():
         if value is None:
             continue
 
         # Handle lists of tools calls in messages
-        if isinstance(value, list):
-            output_dict[key] = [
-                vi if not isinstance(vi, ToolCall) else toolcall_to_dict(vi)
-                for vi in value
-            ]
+        if key=='tool_calls' and value is not None:
+            output_dict[key] = [toolcall_to_dict(tool_call) for tool_call in value]
         else:
             output_dict[key] = value
 
@@ -170,23 +181,19 @@ def message_from_api_response(response: dict) -> AssistantMessage:
     return AssistantMessage(completion.content, tool_calls)
 
 
-def message_from_tool_call(tool_call_id: str, function_output: Any) -> ToolMessage:
-    """Prepare a message from the output of a function."""
-    return ToolMessage(str(function_output), tool_call_id)
-
-
-def start_chat(model: str, api_key: str) -> Callable:
+def start_chat(model: str, client: openai.Client) -> Callable:
     """Make an LLM interface function that you can use with Messages.
 
     This will return a function that can be called with a list of messages.
     Optional arguments to this function should conform with parameter requirements
     of the OpenAI API, e.g., `tools`, `temperature`, `seed`, etc."""
 
-    client = get_openaiai_client(api_key=api_key)
-
     def chat_func(messages: list[Message], *args, **kwargs) -> Message:
+        assert len(messages)>0
+        assert isinstance(messages[0], SystemMessage) or isinstance(messages[0], UserMessage)
+        assert isinstance(messages[-1], UserMessage) or isinstance(messages[-1], ToolMessage)
+
         input_messages = [message_to_dict(message) for message in messages]
-        print(input_messages)
         try:
             response = client.chat.completions.create(
                 messages=input_messages,
@@ -201,10 +208,8 @@ def start_chat(model: str, api_key: str) -> Callable:
     return chat_func
 
 
-def get_embedding_model(model: str, api_key: str) -> Callable:
+def get_embedding_model(model: str, client: openai.Client) -> Callable:
     """Make an embedding function."""
-
-    client = get_openaiai_client(api_key=api_key)
 
     def embedding_func(texts: Iterable[str]) -> list[list[str]]:
         raw_embeddings = client.embeddings.create(
