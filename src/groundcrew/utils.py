@@ -8,7 +8,6 @@ import importlib
 from typing import Any, Callable, Dict, List, Tuple
 
 import yaml
-
 import astunparse
 
 from openai import OpenAI
@@ -65,12 +64,15 @@ def setup_and_load_yaml(filepath: str, key: str) -> Dict[str, Dict[str, Any]]:
     if data is None:
         return {}
 
+    print('DATA:', data, '\n')
     return {item['name']: item for item in data[key]}
 
 
 def setup_tools(
         modules_list: List[Dict[str, Any]],
-        tool_descriptions: Dict[str, Dict[str, str]]) -> Dict[str, Tool]:
+        tool_descriptions: Dict[str, Dict[str, str]],
+        collection,
+        llm) -> Dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -93,70 +95,59 @@ def setup_tools(
         module = importlib.import_module(module_name)
         tools_list = module_dict['tools']
 
-        tool_dict = build_tool_dict_from_module(
-            module, tools_list)
+        # Loop through tools and generate descriptions
+        with open(module.__file__, 'r') as f:
+            file_text = ''.join(f.readlines())
 
-        for func_name, (callable_func, func_str) in tool_dict.items():
-            if func_name in tool_descriptions:
-                print(f'Loading description for {func_name}')
-                description_yaml = yaml.dump(
-                    tool_descriptions[func_name], sort_keys=False)
-            else:
-                print(f'Generating description for {func_name}')
-                tool_yaml = convert_function_str_to_yaml(func_str)
-                tool_yaml = tool_yaml.replace('**kwargs', 'kwargs')
-                tool_dict = yaml.safe_load(tool_yaml)[0]
-                description_yaml = yaml.dump(tool_dict, sort_keys=False)
+        for node in ast.walk(ast.parse(file_text)):
+            if isinstance(node, ast.ClassDef) and node.name in tools_list:
 
-            tool = Tool(
-                name=func_name,
-                function_str=func_str,
-                description=description_yaml,
-                call=callable_func
-            )
-            tools[func_name] = tool
+                # Actual code of the class
+                tool_code = astunparse.unparse(node)
+
+                # Description already generated and in yaml file, so load it.
+                if node.name in tool_descriptions:
+                    print(f'Loading description for {node.name}...')
+                    tool_yaml = yaml.dump(
+                        tool_descriptions[node.name], sort_keys=False)
+
+                else:
+                    print(f'Generating description for {node.name}...')
+
+                    # Generate description of the Tool in YAML format
+                    tool_yaml = convert_tool_str_to_yaml(tool_code)
+
+                    # In case the LLM put ```yaml at the beginning and and ```
+                    # at the end
+                    if '```yaml' in tool_yaml:
+                        tool_yaml = '\n'.join(tool_yaml[1:-1])
+
+                # Convert YAML to a dictionary
+                tool_info_dict = yaml.safe_load(tool_yaml)
+                if isinstance(tool_info_dict, list):
+                    tool_info_dict = tool_info_dict[0]
+
+                # Create an instance of the Tool object
+                tool_obj = getattr(module, node.name)(
+                    tool_info_dict['base_prompt'], collection, llm)
+
+                #description_yaml = yaml.dump(
+                #    tool_info_dict, sort_keys=False)
+
+                tools[node.name] = Tool(
+                    name=node.name,
+                    code=tool_code,
+                    description=tool_info_dict['description'],
+                    base_prompt=tool_info_dict['base_prompt'],
+                    params=tool_info_dict['params'],
+                    obj=tool_obj)
 
     return tools
 
 
-def build_tool_dict_from_module(
-        module: types.ModuleType,
-        tool_names: List[str]) -> Dict[str, Tuple[Callable, str]]:
+def convert_tool_str_to_yaml(function_str: str) -> str:
     """
-    Takes a list of python modules as input and builds a dictionary containing
-    the function name as the key and a tuple containing the callable function
-    and its string representation as the value.
-
-    Args:
-        module (types.ModuleType): The module containing the functions.
-        function_names (List[str]): A list of function names to include in the
-        dictionary.
-
-    Returns:
-        function_dict (Dict[str, Tuple[Callable, str]]): A dictionary mapping
-        function names to tuples containing the callable function and its
-        string representation.
-    """
-    tool_dict = {}
-    with open(module.__file__, 'r') as f:
-        file_text = ''.join(f.readlines())
-
-    for node in ast.walk(ast.parse(file_text)):
-        if isinstance(node, ast.ClassDef) and node.name in tool_names:
-            print('node:', node)
-            print('name:', node.name)
-            class_instance = getattr(module, node.name)
-            callable_function = class_instance
-            exit()
-            function_dict[node.name] = (
-                callable_function, astunparse.unparse(node))
-
-    return function_dict
-
-
-def convert_function_str_to_yaml(function_str: str) -> str:
-    """
-    Convert a given function string to YAML format using a GPT-4 model.
+    Convert a given tool string to YAML format using a GPT-4 model.
 
     Args:
         function_str (str): The string representation of a function.
@@ -164,7 +155,7 @@ def convert_function_str_to_yaml(function_str: str) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.FUNCTION_GPT_PROMPT + '\n\n' + function_str
+    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
     llm = build_llm_client()
     return llm(prompt)
 
@@ -185,8 +176,12 @@ def save_tools_to_yaml(tools: Dict[str, Tool], filename: str) -> None:
     # Convert the tools dictionary into a list of dictionaries
     tools_list = []
     for tool in tools.values():
-        tool_yaml = yaml.safe_load(tool.description)
-        tools_list.append(tool_yaml)
+        tool_dict = {}
+        tool_dict['name'] = tool.name
+        tool_dict['description'] = tool.description
+        tool_dict['base_prompt'] = tool.base_prompt
+        tool_dict['params'] = tool.params
+        tools_list.append(tool_dict)
 
     # Wrap the list in a dictionary with the key 'tools'
     data = {'tools': tools_list}
@@ -194,3 +189,5 @@ def save_tools_to_yaml(tools: Dict[str, Tool], filename: str) -> None:
     # Write the data to the YAML file
     with open(filename, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
+    print(f'Saved {filename}\n')
+

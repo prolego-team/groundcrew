@@ -2,6 +2,8 @@
 """
 from typing import Callable
 
+import yaml
+
 from dataclasses import dataclass
 
 
@@ -42,11 +44,24 @@ class Tool:
     Class to hold a Tool which is a Python function that the agent can use
     """
     name: str
-    function_str: str
+    code: str
     description: str
-    call: Callable
+    base_prompt: str
+    params: dict
+    obj: Callable
+
+    def to_yaml(self):
+        data = {
+            'name': self.name,
+            'description': self.description,
+            'base_prompt': self.base_prompt,
+            'params': self.params
+        }
+        return yaml.dump(
+            data, default_flow_style=False, sort_keys=False)
 
     def to_string(self):
         output = f'\nTool Name: {self.name}\n'
         output += f'Description: {self.description}\n'
+        output += f'Base Prompt: {self.base_prompt}\n'
         return output

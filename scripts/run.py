@@ -7,7 +7,6 @@ from typing import Dict, List
 
 import yaml
 import click
-
 import chromadb
 
 from groundcrew import utils
@@ -82,12 +81,6 @@ def main(config, model):
     # Directory to store generated file and function descriptions
     os.makedirs(config.cache_dir, exist_ok=True)
 
-    # Load or generate Tools
-    tools_filepath = opj(config.cache_dir, 'tools.yaml')
-    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
-    tools = utils.setup_tools(config.Tools, tool_descriptions)
-    #utils.save_tools_to_yaml(tools, tools_filepath)
-
     # Create the chromadb client
     client = chromadb.PersistentClient(config.db_path)
 
@@ -96,6 +89,16 @@ def main(config, model):
 
     # LLM that takes a string as input and returns a string
     llm = utils.build_llm_client(model)
+
+    # Load or generate Tools
+    tools_filepath = opj(config.cache_dir, 'tools.yaml')
+    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
+    tools = utils.setup_tools(
+        config.Tools,
+        tool_descriptions,
+        collection,
+        llm)
+    utils.save_tools_to_yaml(tools, tools_filepath)
 
     # File for storing LLM generated descriptions
     function_descriptions_file = opj(
@@ -128,7 +131,7 @@ def main(config, model):
     print(function_descriptions.keys())
     print('\n')
 
-    agent = Agent(config, collection, llm)
+    agent = Agent(config, collection, llm, tools)
 
     agent.run()
 

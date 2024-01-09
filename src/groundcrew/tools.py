@@ -1,8 +1,5 @@
 """
-use_linter: What module's need code style updates?
-generate_docstrings
-code coupling: circular dependencies
-extract TODO items from code
+File for Tools
 """
 from abc import ABC, abstractmethod
 from typing import Callable
@@ -13,7 +10,7 @@ from groundcrew import code
 from groundcrew.dataclasses import Chunk
 
 
-class Tool(ABC):
+class ToolBase(ABC):
 
     def __init__(self, base_prompt: str, collection, llm):
         """ """
@@ -26,32 +23,30 @@ class Tool(ABC):
         pass
 
 
-class CodebaseQATool(Tool):
+class CodebaseQATool(ToolBase):
 
     def __init__(self, base_prompt: str, collection, llm):
         """ """
         super().__init__(base_prompt, collection, llm)
 
-    def __call__(self, prompt: str, include_code: str):
+    def __call__(self, prompt: str, include_code: bool):
 
         chunks = self.query_codebase(prompt)
 
-        prompt = self.base_prompt + '###Question###\n'
+        prompt = self.base_prompt + '### Question ###\n'
         prompt += f'{prompt}\n\n'
 
         for chunk in chunks:
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
-        print(prompt)
-
         return self.llm(prompt)
 
-    def query_codebase(self, prompt: str):
+    def query_codebase(self, prompt: str, n_results: int=5):
 
         out = self.collection.query(
             query_texts=[prompt],
-            n_results=5,
+            n_results=n_results,
             where={'type': 'function'}
         )
 
