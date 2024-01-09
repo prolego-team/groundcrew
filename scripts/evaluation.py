@@ -29,7 +29,12 @@ from scripts import run
 @click.option('--evals', '-e', default='data/evaluation.yaml')
 @click.option('--n_runs', '-n', default=3)
 @click.option('--output_dir_prefix', '-o', default='eval')
-def main(config, model, evals, n_runs, output_dir_prefix):
+def main(
+        config: str,
+        model: str,
+        evals: str,
+        n_runs: int,
+        output_dir_prefix: str):
     """main program"""
 
     # ~~~~ create output directory
@@ -89,6 +94,8 @@ def main(config, model, evals, n_runs, output_dir_prefix):
             tools_dict=tools_dict,
         )
         results = {**results, **results_suite}
+
+    # ~~~~ save result CSV
 
     output_file_prefix = 'eval'
     output_file_path = os.path.join(output_dir_path, f'{output_file_prefix}.csv')
