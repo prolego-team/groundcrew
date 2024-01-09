@@ -1,4 +1,5 @@
 """
+Main run script
 """
 import os
 import pickle
@@ -23,7 +24,18 @@ def populate_db(
         files: List[str],
         function_descriptions: Dict,
         collection):
+    """
+    Populate a database with metadata and descriptions of Python functions
+    extracted from a list of files.
 
+    Args:
+        repository (str): The base directory where the files are located.
+        files (List[str]): A list of file names to be processed.
+        function_descriptions (Dict): A dictionary mapping function identifiers
+        to their descriptions.
+        collection (object): The database collection where function data is to
+        be upserted.
+    """
     ids = []
     metadatas = []
     documents = []
@@ -72,6 +84,9 @@ def populate_db(
 @click.option('--config', '-c', default='config.yaml')
 @click.option('--model', '-m', default='gpt-3.5-turbo')
 def main(config, model):
+    """
+    Main
+    """
 
     with open(config, 'r') as f:
         config = yaml.safe_load(f)
@@ -126,10 +141,6 @@ def main(config, model):
         function_descriptions,
         collection
     )
-
-    print('FUNCTIONS')
-    print(function_descriptions.keys())
-    print('\n')
 
     agent = Agent(config, collection, llm, tools)
 

@@ -11,26 +11,67 @@ from groundcrew.dataclasses import Chunk
 
 
 class ToolBase(ABC):
+    """
+    Abstract base class for tools that interact with a language model (LLM).
 
-    def __init__(self, base_prompt: str, collection, llm):
-        """ """
+    Attributes:
+        base_prompt (str): The base prompt used for interactions with the LLM.
+        collection (Collection): A chromaDB collection
+        llm (Callable): The language model instance used for generating
+        responses.
+
+    Methods:
+        __call__(prompt: str, **kwargs): Abstract method to be implemented in
+        subclasses.
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """
+        Constructor
+        """
         self.base_prompt = base_prompt
         self.collection = collection
         self.llm = llm
 
     @abstractmethod
     def __call__(self, prompt: str, **kwargs):
+        """
+        The call method
+        """
         pass
 
 
 class CodebaseQATool(ToolBase):
+    """
+    Tool for querying a codebase and generating responses using a language
+    model.  Inherits from ToolBase and implements the abstract methods for
+    specific codebase querying functionality.
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """
+        Initialize the CodebaseQATool with a base prompt, a code collection,
+        and a language model.
 
-    def __init__(self, base_prompt: str, collection, llm):
-        """ """
+        Args:
+            base_prompt (str): The base prompt to prepend to all queries.
+            collection (Collection): The code collection or database to query
+            for code-related information.
+            llm (Callable): The language model to use for generating
+            code-related responses.
+        """
         super().__init__(base_prompt, collection, llm)
 
     def __call__(self, prompt: str, include_code: bool):
+        """
+        Processes a given prompt, queries the codebase, and uses the language
+        model to generate a response.
 
+        Args:
+            prompt (str): The prompt to process.
+            include_code (bool): Flag to include code in the response.
+
+        Returns:
+            str: The generated response from the language model.
+        """
         chunks = self.query_codebase(prompt)
 
         prompt = self.base_prompt + '### Question ###\n'
@@ -43,7 +84,17 @@ class CodebaseQATool(ToolBase):
         return self.llm(prompt)
 
     def query_codebase(self, prompt: str, n_results: int=5):
+        """
+        Queries the codebase for relevant code chunks based on a given prompt.
 
+        Args:
+            prompt (str): The prompt to query the codebase.
+            n_results (int, optional): The number of results to return.
+            Defaults to 5.
+
+        Returns:
+            list: A list of code chunks relevant to the prompt.
+        """
         out = self.collection.query(
             query_texts=[prompt],
             n_results=n_results,

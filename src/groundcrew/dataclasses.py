@@ -9,6 +9,9 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Config:
+    """
+    Class to hold config parameters
+    """
     repository: str
     db_path: str
     cache_dir: str
@@ -41,7 +44,7 @@ class Chunk:
 @dataclass
 class Tool:
     """
-    Class to hold a Tool which is a Python function that the agent can use
+    Class to hold a Tool which is a Python class that the agent can use
     """
     name: str
     code: str

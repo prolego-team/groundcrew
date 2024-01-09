@@ -1,4 +1,5 @@
 """
+Main agent class interacting with a user
 """
 from typing import Any
 
@@ -7,21 +8,41 @@ from groundcrew.tools import CodebaseQATool
 
 
 class Agent:
+    """
+    A class representing an agent that interacts with a user to execute various
+    tools based on user prompts.
 
+    Attributes:
+        config (dict): Configuration settings for the agent.
+        collection (object): The collection or database the agent interacts with.
+        llm (object): A large language model used by the agent for processing
+        and interpreting prompts.
+        tools (dict): A dictionary of tools available for the agent to use.
+
+    Methods:
+        run(): Continuously process user inputs and execute corresponding tools.
+        choose_tool(user_prompt): Analyze the user prompt and select the
+        appropriate tool for response.
+    """
     def __init__(
             self,
             config,
             collection,
             llm,
             tools):
-
+        """
+        Constructor
+        """
         self.config = config
         self.collection = collection
         self.llm = llm
         self.tools = tools
 
     def run(self):
-
+        """
+        Continuously listen for user input and respond using the chosen tool
+        based on the input.
+        """
         while True:
 
             user_prompt = input('> ')
@@ -35,7 +56,17 @@ class Agent:
 
 
     def choose_tool(self, user_prompt):
+        """
+        Analyze the user's input and choose an appropriate tool for generating
+        a response.
 
+        Args:
+            user_prompt (str): The user's input or question.
+
+        Returns:
+            tuple: A tuple containing the chosen tool object and its
+            corresponding parameters.
+        """
         base_prompt = sp.CHOOSE_TOOL_PROMPT
         base_prompt += '### Question ###\n'
         base_prompt += user_prompt + '\n\n'
@@ -119,8 +150,5 @@ class Agent:
                         param_value=None
 
                 args[param_name.replace(' ', '')] = param_value
-
-        #if 'kwargs' in args:
-        #    args = self.substitute_variable_values_kwargs(args)
 
         return args
