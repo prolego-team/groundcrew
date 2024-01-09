@@ -135,7 +135,9 @@ def summarize_file(
             prompt = filepath + '\n\n' + file_text + '\n\n'
             prompt += sp.SUMMARIZE_FILE_PROMPT
             file_summary = llm(prompt)
-        descriptions[key] = file_summary
+            descriptions[key] = file_summary
+        else:
+            file_summary = descriptions[key]
 
     return file_summary, code_dict
 
