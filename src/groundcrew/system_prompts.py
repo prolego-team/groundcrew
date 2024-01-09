@@ -1,6 +1,18 @@
 """
 """
 
+SUMMARIZE_FILE_PROMPT = """
+Your task is to generate a concise summary of the above text. Keep your summary to 5 sentences or less.
+
+"""
+
+SUMMARIZE_CODE_PROMPT = """
+Your task is to generate a concise summary of the above Python code. Keep your summary to 5 sentences or less. Include in your summary:
+    - Dependencies
+    - Important functions and clasess
+    - Relevant information from comments and docstrings
+"""
+
 CHOOSE_TOOL_PROMPT = """Your task is to choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in the following format.
 
 Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
