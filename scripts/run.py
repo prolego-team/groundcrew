@@ -168,7 +168,6 @@ def main(config: str, model: str):
 
     with open(config, 'r') as f:
         config = yaml.safe_load(f)
-
     config = Config(**config)
 
     # Directory to store generated file and function descriptions
@@ -178,7 +177,7 @@ def main(config: str, model: str):
     client = chromadb.PersistentClient(config.db_path)
 
     # Initialize the database and get a list of files in the repo
-    collection, files = init_db(client, config.repository)
+    collection, files = init_db(client, config.repository, config.extensions)
     files = sorted(files)
 
     # LLM that takes a string as input and returns a string
