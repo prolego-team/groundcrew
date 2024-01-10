@@ -1,2 +1,4 @@
 chromadb==0.4.22
 openai==1.6.1
+torch==2.1.2
+pytest==7.4.4
