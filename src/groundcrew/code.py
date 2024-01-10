@@ -69,10 +69,9 @@ def extract_python_from_file(file_text, node_type):
     return texts
 
 
-def init_db(client, repository):
+def init_db(client, repository, exts):
 
     # Get the committed files from the repo
-    exts = ['.py', '.txt', '.yaml', '.yml', '.sh', '.md', '.toml', '.json']
     files = list(get_committed_files(repository, exts))
     files = [x.split(os.path.abspath(repository))[1][1:] for x in files]
 

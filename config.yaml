@@ -1,4 +1,5 @@
 repository: ../neo-sophia
+extensions: ['.py', '.txt', '.yaml', '.yml', '.sh', '.md', '.toml']
 db_path: .database/
 cache_dir: .cache/
 Tools:
