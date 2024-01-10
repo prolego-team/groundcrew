@@ -98,15 +98,14 @@ class CodebaseQATool(ToolBase):
         out = self.collection.query(
             query_texts=[prompt],
             n_results=n_results,
-            where={'type': 'function'}
+            #where={'type': 'function'} # TODO - might want the LLM to choose which types to query
         )
 
         return [
             Chunk(
-                name=metadata['name'],
                 uid=metadata['id'],
-                typ='function',
-                text=metadata['function_text'], # TODO - change to just text
+                typ=metadata['type'],
+                text=metadata['text'],
                 document=doc,
                 filepath=metadata['filepath'],
                 start_line=metadata['start_line'],

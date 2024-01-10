@@ -2,10 +2,9 @@
 """
 import os
 import ast
-import types
 import importlib
 
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any
 
 import yaml
 import astunparse
@@ -36,7 +35,7 @@ def build_llm_client(model: str='gpt-4-1106-preview'):
     return chat_complete
 
 
-def setup_and_load_yaml(filepath: str, key: str) -> Dict[str, Dict[str, Any]]:
+def setup_and_load_yaml(filepath: str, key: str) -> dict[str, dict[str, Any]]:
     """
     Helper function to set up workspace, create a file if it doesn't exist,
     and load data from a YAML file.
@@ -64,15 +63,14 @@ def setup_and_load_yaml(filepath: str, key: str) -> Dict[str, Dict[str, Any]]:
     if data is None:
         return {}
 
-    print('DATA:', data, '\n')
     return {item['name']: item for item in data[key]}
 
 
 def setup_tools(
-        modules_list: List[Dict[str, Any]],
-        tool_descriptions: Dict[str, Dict[str, str]],
+        modules_list: list[dict[str, Any]],
+        tool_descriptions: dict[str, dict[str, str]],
         collection,
-        llm) -> Dict[str, Tool]:
+        llm) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -131,9 +129,6 @@ def setup_tools(
                 tool_obj = getattr(module, node.name)(
                     tool_info_dict['base_prompt'], collection, llm)
 
-                #description_yaml = yaml.dump(
-                #    tool_info_dict, sort_keys=False)
-
                 tools[node.name] = Tool(
                     name=node.name,
                     code=tool_code,
@@ -160,7 +155,7 @@ def convert_tool_str_to_yaml(function_str: str) -> str:
     return llm(prompt)
 
 
-def save_tools_to_yaml(tools: Dict[str, Tool], filename: str) -> None:
+def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
     """
     Converts a dictionary of tools into YAML format and saves it to a file.
 

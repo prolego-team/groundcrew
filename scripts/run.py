@@ -196,10 +196,12 @@ def main(config: str, model: str):
             descriptions = pickle.load(f)
 
     # Generate summaries for files, classes, and functions
-    for filepath in files:
+    for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
         summarize_file(filepath, llm, descriptions)
-        if filepath.endswith('.py') and '__init__.py' not in filepath:
+
+        # TODO - remove before merging
+        if i > 5:
             break
 
     # Save the descriptions to a file in the cache directory

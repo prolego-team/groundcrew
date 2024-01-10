@@ -4,7 +4,6 @@ Main agent class interacting with a user
 from typing import Any
 
 from groundcrew import agent_utils as autils, system_prompts as sp
-from groundcrew.tools import CodebaseQATool
 
 
 class Agent:
@@ -88,20 +87,7 @@ class Agent:
             if parsed_tool_response['Tool'] in self.tools:
                 tool = self.tools[parsed_tool_response['Tool']]
 
-            else:
-                # TODO
-                tool_name = parsed_tool_response['Tool']
-                error_msg = f'{tool_name} not in TOOLS. '
-                error_msg += 'Choose a tool from the TOOLS section'
-                step = {
-                    'status': 'error',
-                    'message': error_msg
-                }
-                tool_failure_steps.append(step)
-                self.all_steps.append(step)
-                self.log.add(
-                    'TOOL AGENT', f'ERROR - Wrong Tool chosen: {tool_name}')
-                self.log.add('TOOL AGENT', error_msg)
+            # TODO - handle case where tool is not found
 
             return tool, self.extract_params(parsed_tool_response)
 

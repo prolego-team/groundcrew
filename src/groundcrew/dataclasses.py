@@ -24,15 +24,14 @@ class Chunk:
     """
     Class to hold text data such as a python function, text file, etc.
 
-    if typ is 'function':
-        document is the function description
+    if typ is 'function' or 'class':
+        document is the function/class summary
         text is the function code
 
     if typ is 'file':
         document is the file summary
         text is the entire file text
     """
-    name: str
     uid: str
     typ: str
     text: str

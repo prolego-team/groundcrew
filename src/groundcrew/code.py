@@ -3,14 +3,9 @@
 import os
 import ast
 
-from typing import Callable, Dict, List
-
-import chromadb
-
 from git import Repo
-from tqdm import tqdm
 
-from groundcrew.constants import DEFAULT_COLLECTION_NAME, DEFAULT_EF
+from groundcrew.constants import DEFAULT_EF
 
 opj = os.path.join
 
@@ -20,7 +15,7 @@ def format_chunk(chunk, include_text):
     # TODO - change Document based on chunk type
     # TODO - start and end lines won't be needed if typ is a file
 
-    prompt = f'Name: {chunk.name}\n'
+    prompt = f'Name: {chunk.uid}\n'
     prompt += f'Type: {chunk.typ}\n'
     if include_text:
         prompt += f'Full Text: {chunk.text}\n'
@@ -31,17 +26,17 @@ def format_chunk(chunk, include_text):
 
 
 def get_committed_files(
-        repository_dir: str, extensions: List[str]) -> List[str]:
+        repository_dir: str, extensions: list[str]) -> list[str]:
     """
     This function finds all files in a directory and filters out those not
     committed to the repository
 
     Args:
         repository_dir: str
-        extensions: List[str]
+        extensions: list[str]
 
     Returns:
-        List[str]
+        list[str]
     """
 
     committed_files = set()
