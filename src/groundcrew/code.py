@@ -9,7 +9,7 @@ import chromadb
 from git import Repo
 from tqdm import tqdm
 
-from groundcrew.constants import DEFAULT_EF
+from groundcrew.constants import DEFAULT_EF, DEFAULT_COLLECTION_NAME
 
 opj = os.path.join
 
@@ -92,7 +92,7 @@ def init_db(client: chromadb.Client, repository: str) -> tuple[chromadb.Collecti
     files = [x.split(os.path.abspath(repository))[1][1:] for x in files]
 
     collection = client.get_or_create_collection(
-        name='database', embedding_function=DEFAULT_EF
+        name=DEFAULT_COLLECTION_NAME, embedding_function=DEFAULT_EF
     )
 
     return collection, files

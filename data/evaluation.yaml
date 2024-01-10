@@ -1,0 +1,14 @@
+- name: Codebase QA
+  tests:
+    - tool: codebase_qa
+      question: Is there functionality to extract text from a pdf
+      eval_func:
+        typ: match_word_any
+        words: ['extract_text_from_pdf']
+        strip_quotes: true
+    - tool: codebase_qa
+      question: How do I first find the paths for PDFs?
+      eval_func:
+        typ: match_word_any
+        words: ['find_pdfs_in_directory']
+        strip_quotes: true
