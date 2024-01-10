@@ -1,18 +1,23 @@
 """
+Core agent functionality.
 """
+
+from typing import Callable
+
 import chromadb
 
-from chromadb.utils import embedding_functions
 from groundcrew.tools import codebase_qa
+from groundcrew import dataclasses as dc
 
 
 class Agent:
+    """Core agent functionality."""
 
     def __init__(
             self,
-            config,
-            collection,
-            llm):
+            config: dc.Config,
+            collection: chromadb.Collection,
+            llm: Callable):
 
         self.config = config
         self.collection = collection
@@ -22,8 +27,6 @@ class Agent:
 
         while True:
 
-            base_prompt = 'Choose the correct tool to answer the following question.'
-
             prompt = input('> ')
             if not prompt:
                 prompt = 'What is the name of the function that finds pdfs in a directory?'
@@ -32,4 +35,3 @@ class Agent:
 
             print(response)
             print('\n', 80 * '*', '\n')
-
