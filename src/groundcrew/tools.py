@@ -1,12 +1,18 @@
 """
-use_linter
-codebase_qa
-
+Tools.
 """
+
+from typing import Callable
+
+import chromadb
+
 from groundcrew.dataclasses import Chunk
 
 
-def format_chunk(chunk, include_text):
+def format_chunk(chunk: Chunk, include_text: bool) -> str:
+    """
+    Format a chunk object as a string for use in a prompt.
+    """
 
     # TODO - change Document based on chunk type
     # TODO - start and end lines won't be needed if typ is a file
@@ -21,7 +27,7 @@ def format_chunk(chunk, include_text):
     return prompt
 
 
-def codebase_qa(prompt, collection, llm):
+def codebase_qa(prompt: str, collection: chromadb.Collection, llm: Callable) -> str:
     """
     Ask a question about the codebase and get an answer
     """

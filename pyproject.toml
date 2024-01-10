@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-    "setuptools>=61.0",
+    "setuptools>=65.0",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -27,6 +27,8 @@ dependencies = [
     #"sentence-transformers==2.2.2",
     #"torch>=2.0.0",
     #"tqdm>=4.65.0"
+    "openai>=1.6.1",
+    "torch>=2.1.0",
 ]
 
 [project.urls]

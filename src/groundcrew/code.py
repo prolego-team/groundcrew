@@ -5,9 +5,10 @@ import ast
 
 from typing import Callable, Dict, List
 
+import chromadb
+from git import Repo
 from tqdm import tqdm
 
-from git import Repo
 from groundcrew.constants import DEFAULT_EF
 
 opj = os.path.join
@@ -85,7 +86,7 @@ def generate_function_descriptions(
     return function_descriptions
 
 
-def init_db(client, repository):
+def init_db(client: chromadb.Client, repository: str) -> tuple[chromadb.Collection, list[str]]:
 
     # Get the committed files from the repo
     exts = ['.py', '.txt', '.yaml', '.yml', '.sh']
