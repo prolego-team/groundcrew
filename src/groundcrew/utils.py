@@ -16,7 +16,7 @@ from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
 
 
-def build_llm_client(model='gpt-4-1106-preview'):
+def build_llm_client(model: str='gpt-4-1106-preview'):
     """
 
     """

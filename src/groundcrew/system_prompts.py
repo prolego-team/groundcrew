@@ -2,7 +2,7 @@
 """
 
 SUMMARIZE_FILE_PROMPT = """
-Your task is to generate a concise summary of the above text. Keep your summary to 5 sentences or less.
+Your task is to generate a concise summary of the above text and describe what the file is for. Keep your summary to 5 sentences or less.
 
 """
 
