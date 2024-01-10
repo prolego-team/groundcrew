@@ -9,11 +9,9 @@ import chromadb
 from git import Repo
 from tqdm import tqdm
 
-from groundcrew.constants import DEFAULT_EF
+from groundcrew.constants import DEFAULT_EF, DEFAULT_COLLECTION_NAME
 
 opj = os.path.join
-
-DEFAULT_COLLECTION_NAME = 'database'
 
 
 def get_committed_files(
