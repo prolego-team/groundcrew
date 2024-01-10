@@ -13,6 +13,7 @@ class Config:
     Class to hold config parameters
     """
     repository: str
+    extensions: list[str]
     db_path: str
     cache_dir: str
     Tools: [str]
