@@ -106,7 +106,7 @@ class CodebaseQATool(ToolBase):
                 name=metadata['name'],
                 uid=metadata['id'],
                 typ='function',
-                text=metadata['function_text'],
+                text=metadata['function_text'], # TODO - change to just text
                 document=doc,
                 filepath=metadata['filepath'],
                 start_line=metadata['start_line'],

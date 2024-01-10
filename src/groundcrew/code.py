@@ -5,10 +5,12 @@ import ast
 
 from typing import Callable, Dict, List
 
+import chromadb
+
 from git import Repo
 from tqdm import tqdm
 
-from groundcrew.constants import DEFAULT_EF
+from groundcrew.constants import DEFAULT_COLLECTION_NAME, DEFAULT_EF
 
 opj = os.path.join
 

@@ -69,3 +69,4 @@ class Tool:
         output += f'Description: {self.description}\n'
         output += f'Base Prompt: {self.base_prompt}\n'
         return output
+

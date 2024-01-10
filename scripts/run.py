@@ -221,8 +221,8 @@ def main(config: str, model: str):
         collection,
         llm)
     utils.save_tools_to_yaml(tools, tools_filepath)
-    agent = Agent(config, collection, llm, tools)
 
+    agent = Agent(config, collection, llm, tools)
     agent.run()
 
 
