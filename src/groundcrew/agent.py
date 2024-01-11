@@ -1,9 +1,12 @@
 """
 Main agent class interacting with a user
 """
+import readline
+
 from typing import Any
 
 from groundcrew import agent_utils as autils, system_prompts as sp
+from groundcrew.dataclasses import Colors
 
 
 class Agent:
@@ -46,12 +49,12 @@ class Agent:
 
             user_prompt = input('> ')
             if not user_prompt:
-                user_prompt = 'What is the name of the function that finds pdfs in a directory?'
-
+                user_prompt = 'Generate the docstring for the function calculate_prompt_cost'
             tool, args = self.choose_tool(user_prompt)
             response = tool.obj(user_prompt, **args)
 
-            print(response)
+            print(Colors.GREEN)
+            print(response, Colors.ENDC)
 
 
     def choose_tool(self, user_prompt):
@@ -66,21 +69,31 @@ class Agent:
             tuple: A tuple containing the chosen tool object and its
             corresponding parameters.
         """
-        base_prompt = sp.CHOOSE_TOOL_PROMPT
+
+        base_prompt = '### Tools ###\n'
+        for tool in self.tools.values():
+            base_prompt += tool.to_yaml() + '\n\n'
+
         base_prompt += '### Question ###\n'
         base_prompt += user_prompt + '\n\n'
 
-        base_prompt += '### Tools ###\n'
-        for tool in self.tools.values():
-            base_prompt += tool.to_yaml() + '\n\n'
+        base_prompt += sp.CHOOSE_TOOL_PROMPT
 
         tool_prompt = base_prompt
 
         tool = None
         while tool is None:
 
+            print(Colors.MAGENTA)
+            print(tool_prompt, Colors.ENDC, '\n')
+
             # Choose a Tool
             tool_response = self.llm(tool_prompt)
+
+            print(Colors.GREEN)
+            print(tool_response, Colors.ENDC)
+
+            # Parse Tool response
             parsed_tool_response = autils.parse_response(
                 tool_response, keywords=['Reason', 'Tool'])
 

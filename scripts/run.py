@@ -198,11 +198,20 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
-        summarize_file(filepath, llm, descriptions)
+
+        #if 'examples' in filepath:
+        #    continue
+        #if 'src/neosophia/agents' not in filepath:
+        #    continue
+        #if 'test_' in filepath:
+        #    continue
+
+        if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
+            summarize_file(filepath, llm, descriptions)
 
         # TODO - remove before merging
-        if i > 5:
-            break
+        #if i > 5:
+        #    break
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:

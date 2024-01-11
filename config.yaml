@@ -6,4 +6,4 @@ Tools:
   - module: groundcrew.tools
     tools:
       - CodebaseQATool
-      - DocstringTool
+      - SingleDocstringTool

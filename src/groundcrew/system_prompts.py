@@ -1,6 +1,9 @@
 """
 """
 
+DOCSTRING_PROMPT = """ Your response must be formatted such that the first line is the function definition, and below it is the docstring. Do not engage in conversation or print any of the function's code. Do not include ```python or ``` in your response. If there are multiple functions, separate them by two newlines.
+"""
+
 SUMMARIZE_FILE_PROMPT = """
 Your task is to generate a concise summary of the above text and describe what the file is for. Keep your summary to 5 sentences or less.
 
@@ -13,13 +16,14 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in the following format.
+CHOOSE_TOOL_PROMPT = """Your task is to choose the correct tool and parameters to answer the question. Each tool has a list of parameters along with which are required or not. If a parameter is required, you MUST generate a value for it. Do not engage in any conversation - your answer must be in the following format.
 
 Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
 Tool: Tool Name
-Parameter_0: Parameter_0 Name | Variable value | parameter type
+Parameter_0: Parameter_0 Name | Variable_0 value | parameter type
+Parameter_1: Parameter_1 Name | Variable_1 value | parameter type
 ...
-Parameter_N: Parameter_N Name | Variable value | parameter type
+Parameter_N: Parameter_N Name | Variable_N value | parameter type
 
 """
 
