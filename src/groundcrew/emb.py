@@ -2,7 +2,6 @@
 Embedding models and related functionality.
 """
 
-from typing import List, Tuple
 import torch
 
 import torch.nn.functional as F
@@ -16,7 +15,7 @@ E5_BASE_V2 = 'intfloat/e5-base-v2'
 E5_LARGE_V2 = 'intfloat/e5-large-v2'
 
 
-def load_e5(model_name: str, cache_dir_path: str) -> Tuple[tfs.BertTokenizerFast, tfs.BertModel]:
+def load_e5(model_name: str, cache_dir_path: str) -> tuple[tfs.BertTokenizerFast, tfs.BertModel]:
     """load E5 tokenizer and model"""
 
     tokenizer = AutoTokenizer.from_pretrained(
@@ -36,7 +35,7 @@ def load_e5(model_name: str, cache_dir_path: str) -> Tuple[tfs.BertTokenizerFast
 def e5_embeddings(
         tokenizer: tfs.BertTokenizerFast,
         model: tfs.BertModel,
-        text_batch: List[str]
+        text_batch: list[str]
         ) -> torch.Tensor:
     """
     Get embeddings using an e5 tokenizer and model.
@@ -60,7 +59,7 @@ def e5_embeddings(
 def e5_embeddings_windowed(
         tokenizer: tfs.BertTokenizerFast,
         model: tfs.BertModel,
-        text_batch: List[str],
+        text_batch: list[str],
         window_tokens: int,
         overlap_tokens: int
         ) -> torch.Tensor:
