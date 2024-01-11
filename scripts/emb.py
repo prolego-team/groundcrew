@@ -2,10 +2,6 @@
 Figure out how chromadb embedding stuff works.
 """
 
-# Copyright (c) 2023 Prolego Inc. All rights reserved.
-# Ben Zimmer
-
-
 import click
 import chromadb
 import numpy as np
