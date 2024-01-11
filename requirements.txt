@@ -1,3 +1,4 @@
+numpy==1.26.3
 chromadb==0.4.22
 GitPython==3.1.40
 openai==1.6.1
