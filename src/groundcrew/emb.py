@@ -87,9 +87,9 @@ def e5_embeddings_windowed(
             extra = window_tokens - chunk['input_ids'].shape[1]
             print(shape[1], idx, idx + window_tokens, extra)
             zeros = torch.zeros((n_batch, extra), dtype=torch.int64)
-            chunk['input_ids'] = torch.concat([chunk['input_ids'], zeros], axis=1)
-            chunk['token_type_ids'] = torch.concat([chunk['token_type_ids'], zeros], axis=1)
-            chunk['attention_mask'] = torch.concat([chunk['attention_mask'], zeros], axis=1)
+            chunk['input_ids'] = torch.concat([chunk['input_ids'], zeros], dim=1)
+            chunk['token_type_ids'] = torch.concat([chunk['token_type_ids'], zeros], dim=1)
+            chunk['attention_mask'] = torch.concat([chunk['attention_mask'], zeros], dim=1)
 
         chunks.append(chunk)
 
@@ -97,7 +97,7 @@ def e5_embeddings_windowed(
     n_chunks = len(chunks)
 
     batch_dict = {
-        k: torch.concat([x[k] for x in chunks], axis=0)
+        k: torch.concat([x[k] for x in chunks], dim=0)
         for k in batch_dict
     }
 
@@ -108,21 +108,37 @@ def e5_embeddings_windowed(
     with torch.no_grad():
         outputs = model(**batch_dict)
 
-    # TODO: how to handle all masked stuff here??? need to think
+    outputs = outputs.last_hidden_state
+    emb_dim = outputs.shape[2]
 
-    embeddings = average_pool(outputs.last_hidden_state, batch_dict['attention_mask'])
+    attention_mask = batch_dict['attention_mask']
 
-    # pivot and aggregate
+    # before pivot
+    assert outputs.shape == (n_batch * n_chunks, window_tokens, emb_dim)
+    assert attention_mask.shape == (n_batch * n_chunks, window_tokens)
 
-    embeddings = torch.mean(
-        torch.concat(
-            [
-                embeddings[idx:idx + n_batch, :][:, :, None]
-                for idx in range(0, embeddings.shape[0], n_batch)
-            ], axis=2
-        ),
-        axis=2
-    )
+    # pivot before average pool
+    # outputs:        (n_batch * n_chunks) x window_size x emb_dim -> n_batch x (window_size * n_chunks) x emb_dim
+    # attention_mask: (n_batch * n_chunks) x window_size           -> n_batch x (window_size * n_chunks)
+
+    outputs = torch.concat([
+        outputs[idx:idx + n_batch, :]
+        for idx in range(0, outputs.shape[0], n_batch)
+    ], dim=1)
+
+    attention_mask = torch.concat([
+        attention_mask[idx:idx + n_batch, :]
+        for idx in range(0, attention_mask.shape[0], n_batch)
+    ], dim=1)
+
+    # after pivot
+    assert outputs.shape == (n_batch, window_tokens * n_chunks, emb_dim)
+    assert attention_mask.shape == (n_batch, window_tokens * n_chunks)
+
+    # (if we average pool first before pivoting, there will be batch items
+    # that go into the average pooling with all-zero masks)
+
+    embeddings = average_pool(outputs, attention_mask)
 
     # (Optionally) normalize embeddings
     embeddings = F.normalize(embeddings, p=2, dim=1)
