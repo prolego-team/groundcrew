@@ -47,57 +47,27 @@ Restrictions:
 - Do not include ```yaml in your answer
 
 ### Example Input ###
-class CodebaseQATool(Tool):
+class ToolExample(Tool):
 
     def __init__(self, base_prompt: str, collection, llm):
         """ """
         super().__init__(base_prompt, collection, llm)
 
-    def __call__(self, prompt: str, include_code: str):
+    def __call__(self, prompt: str, parameter_1: str):
 
-        chunks = self.query_codebase(prompt)
+        # Logic here with parameter_1
+        output = ... # output from database from parameter_1
 
-        prompt = self.base_prompt + '### Question ###\n'
-        prompt += f'{prompt}\n\n'
-
-        for chunk in chunks:
-            prompt += code.format_chunk(chunk, include_text=include_code)
-            prompt += '--------\n\n'
-
-        print(prompt)
-
-        return self.llm(prompt)
-
-    def query_codebase(self, prompt: str):
-
-        out = self.collection.query(
-            query_texts=[prompt],
-            n_results=5,
-            where={'type': 'function'}
-        )
-
-        return [
-            Chunk(
-                name=metadata['name'],
-                uid=metadata['id'],
-                typ='function',
-                text=metadata['function_text'],
-                document=doc,
-                filepath=metadata['filepath'],
-                start_line=metadata['start_line'],
-                end_line=metadata['end_line']
-            ) for id_, metadata, doc in zip(
-                out['ids'][0], out['metadatas'][0], out['documents'][0]
-                )
-        ]
+        full_prompt = output + '\n' + self.base_prompt + prompt
+        return self.llm(full_prompt)
 
 ### Example Output ###
-  - name: CodebaseQATool
-    description: This tool takes a user question as input, searches the codebase for relevant files and functions, then uses a large language model to analyze the data and answer the user's question
-    base_prompt: Your task is to answer the question given the following data. Be descriptive in your answer and provide full filepaths and line numbers.
+  - name: ToolExample
+    description: This tool takes a prompt and parameter_1, does some logic with parameter_1, then uses a large language model to answer the user's question.
+    base_prompt: Your task is to answer the question given the following data. Be descriptive in your answer.
     params:
-      include_code:
-        description: Whether or not to include code in the LLM's response
-        type: bool
+      parameter_1:
+        description: Description of parameter_1
+        type: str
         required: true
 """
