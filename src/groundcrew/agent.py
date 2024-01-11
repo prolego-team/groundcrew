@@ -48,6 +48,8 @@ class Agent:
         while True:
 
             user_prompt = input('> ')
+
+            # TODO - Just for testing, remove later
             if not user_prompt:
                 user_prompt = 'Generate the docstring for the function calculate_prompt_cost'
             tool, args = self.choose_tool(user_prompt)
