@@ -32,6 +32,38 @@ class ToolBase(ABC):
         self.collection = collection
         self.llm = llm
 
+    def query_codebase(self, prompt: str, n_results: int=5):
+        """
+        Queries the codebase for relevant code chunks based on a given prompt.
+
+        Args:
+            prompt (str): The prompt to query the codebase.
+            n_results (int, optional): The number of results to return.
+            Defaults to 5.
+
+        Returns:
+            list: A list of code chunks relevant to the prompt.
+        """
+        out = self.collection.query(
+            query_texts=[prompt],
+            n_results=n_results,
+            #where={'type': 'function'} # TODO - might want the LLM to choose which types to query
+        )
+
+        return [
+            Chunk(
+                uid=metadata['id'],
+                typ=metadata['type'],
+                text=metadata['text'],
+                document=doc,
+                filepath=metadata['filepath'],
+                start_line=metadata['start_line'],
+                end_line=metadata['end_line']
+            ) for id_, metadata, doc in zip(
+                out['ids'][0], out['metadatas'][0], out['documents'][0]
+                )
+        ]
+
     @abstractmethod
     def __call__(self, prompt: str, **kwargs):
         """
@@ -68,6 +100,56 @@ class CodebaseQATool(ToolBase):
         Args:
             prompt (str): The prompt to process.
             include_code (bool): Flag to include code in the response.
+
+        Returns:
+            str: The generated response from the language model.
+        """
+        chunks = self.query_codebase(prompt)
+
+        prompt = self.base_prompt + '### Question ###\n'
+        prompt += f'{prompt}\n\n'
+
+        for chunk in chunks:
+            prompt += code.format_chunk(chunk, include_text=include_code)
+            prompt += '--------\n\n'
+
+        return self.llm(prompt)
+
+
+class DocstringTool(ToolBase):
+    """
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """
+        Initialize the DocstringTool with a base prompt, a code collection,
+        and a language model.
+
+        Args:
+            base_prompt (str): The base prompt to prepend to all queries.
+            collection (Collection): The code collection or database to query
+            for code-related information.
+            llm (Callable): The language model to use for generating
+            code-related responses.
+        """
+        super().__init__(base_prompt, collection, llm)
+
+    def __call__(
+            self,
+            prompt: str,
+            files: list[str],
+            function_names: list[str],
+            class_names: list[str]):
+        """
+        Scenarios:
+            - User wants to generate a docstring for:
+                - all files in the repo
+                - a specific file
+                - a specific function
+                - a specific class
+
+
+        Args:
+            prompt (str): The prompt to process.
 
         Returns:
             str: The generated response from the language model.
