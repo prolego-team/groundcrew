@@ -157,9 +157,9 @@ def average_pool(
 
     # this is how things were written in the example
     # https://huggingface.co/intfloat/e5-base-v2
-    last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
-    return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
+    # last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
+    # return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
-    # I would write stuff like this I think...should be equivalent
-    # last_hidden = last_hidden_states * attention_mask[..., None]
-    # return torch.sum(last_hidden, dim=1) / torch.sum(attention_mask, dim=1)[..., None]
+    # This is functionally equivalent and clearer IMO:
+    last_hidden = last_hidden_states * attention_mask[:, :, None]
+    return torch.sum(last_hidden, dim=1) / torch.sum(attention_mask, dim=1)[:, None]
