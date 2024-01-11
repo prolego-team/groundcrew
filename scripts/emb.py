@@ -6,16 +6,18 @@ Figure out how chromadb embedding stuff works.
 # Ben Zimmer
 
 
+import click
 import chromadb
 import numpy as np
-import torch
 import transformers as tfs
 
 from groundcrew import code
 from groundcrew import emb as ef
 
 
-def main():
+@click.command()
+@click.option('--models_dir_path', '-m', required=True)
+def main(models_dir_path: str):
     """main program"""
 
     # ~~~~ prepare a set of documents
@@ -67,8 +69,6 @@ def main():
 
     # ~~~~ collection with custom embedding function
 
-    models_dir_path = '/Users/ben/Prolego/models'
-
     tokenizer, model = ef.load_e5(
         model_name=ef.E5_SMALL_V2,
         cache_dir_path=models_dir_path
@@ -92,6 +92,12 @@ def main():
         print(uid, len(doc), np.array(emb[:5]), '...', np.array(emb[-5:]))
 
     # all embeddings are distinct
+    for idx_a, emb_a in enumerate(embs):
+        for idx_b, emb_b in enumerate(embs):
+            if idx_a != idx_b:
+                assert emb_a != emb_b, (idx_a, idx_b)
+            else:
+                assert emb_a == emb_b, (idx_a, idx_b)
 
 
 class E5EmbeddingFunction(chromadb.EmbeddingFunction):
@@ -106,11 +112,11 @@ class E5EmbeddingFunction(chromadb.EmbeddingFunction):
         """Create embeddings using E5."""
 
         emb_tensor = ef.e5_embeddings_windowed(
-            self.tokenizer,
-            self.model,
-            input,
-            512,
-            256
+            tokenizer=self.tokenizer,
+            model=self.model,
+            text_batch=input,
+            window_tokens=512,
+            overlap_tokens=256
         )
 
         return [x.tolist() for x in emb_tensor]

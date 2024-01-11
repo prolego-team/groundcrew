@@ -38,7 +38,10 @@ def e5_embeddings(
         model: tfs.BertModel,
         text_batch: List[str]
         ) -> torch.Tensor:
-    """aldskfjhaldkjfh aldjf"""
+    """
+    Get embeddings using an e5 tokenizer and model.
+    Max token length here is 512.
+    """
 
     # Tokenize the input texts
     batch_dict = tokenizer(text_batch, max_length=512, padding=True, truncation=True, return_tensors='pt')
@@ -60,20 +63,23 @@ def e5_embeddings_windowed(
         text_batch: List[str],
         window_tokens: int,
         overlap_tokens: int
-    ) -> torch.Tensor:
-    """adkfj haldkjf halsdkjfh """
+        ) -> torch.Tensor:
+    """
+    Get embeddings using an e5 tokenizer and model.
+    Calculates windows with a certain overlap amount.
+    """
+
+    assert window_tokens <= 512
 
     n_batch = len(text_batch)
 
     # Tokenize the input texts
     batch_dict = tokenizer(text_batch, max_length=None, padding=True, truncation=False, return_tensors='pt')
 
-    # Make windows along dimension 1
-    # and pivot into a new batch
+    # make windows along the first dimension
     shape = batch_dict['input_ids'].shape
-
     offset = window_tokens - overlap_tokens
-    print(shape)
+
     chunks = []
     for idx in range(0, shape[1], offset):
         chunk = dict(
@@ -83,9 +89,8 @@ def e5_embeddings_windowed(
         )
 
         if chunk['input_ids'].shape[1] < window_tokens:
-            continue
             extra = window_tokens - chunk['input_ids'].shape[1]
-            print(shape[1], idx, idx + window_tokens, extra)
+            # print(shape[1], idx, idx + window_tokens, extra)
             zeros = torch.zeros((n_batch, extra), dtype=torch.int64)
             chunk['input_ids'] = torch.concat([chunk['input_ids'], zeros], dim=1)
             chunk['token_type_ids'] = torch.concat([chunk['token_type_ids'], zeros], dim=1)
@@ -93,24 +98,22 @@ def e5_embeddings_windowed(
 
         chunks.append(chunk)
 
-    # concat along batch dimension
     n_chunks = len(chunks)
 
+    # reassemble by concat along batch dimension
     batch_dict = {
         k: torch.concat([x[k] for x in chunks], dim=0)
         for k in batch_dict
     }
-
     for v in batch_dict.values():
-        print(v.shape)
         assert v.shape[0] == n_batch * n_chunks
 
+    # run model
     with torch.no_grad():
         outputs = model(**batch_dict)
 
     outputs = outputs.last_hidden_state
     emb_dim = outputs.shape[2]
-
     attention_mask = batch_dict['attention_mask']
 
     # before pivot
@@ -153,10 +156,10 @@ def average_pool(
     """average pooling using attention mask"""
 
     # this is how things were written in the example
+    # https://huggingface.co/intfloat/e5-base-v2
     last_hidden = last_hidden_states.masked_fill(~attention_mask[..., None].bool(), 0.0)
     return last_hidden.sum(dim=1) / attention_mask.sum(dim=1)[..., None]
 
-    # I would write stuff like this I think
-    # should be equivalent
+    # I would write stuff like this I think...should be equivalent
     # last_hidden = last_hidden_states * attention_mask[..., None]
     # return torch.sum(last_hidden, dim=1) / torch.sum(attention_mask, dim=1)[..., None]
