@@ -10,7 +10,7 @@ version = "0.1.0"
 authors = [
   {name="Prolego, Inc.", email="russ@prolego.com"},
 ]
-description = "An experimental LLM-based codebase assistant."
+description = "A natural language tool to interact with an entire codebase."
 readme = "README.md"
 requires-python = ">=3.11"
 classifiers = [
@@ -19,6 +19,14 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    #"datasets>=2.10.1",
+    #"nltk==3.8.1",
+    #"numpy>=1.24.2",
+    #"openai>=1.6.1",
+    #"rank_bm25==0.2.2",
+    #"sentence-transformers==2.2.2",
+    #"torch>=2.0.0",
+    #"tqdm>=4.65.0"
     "openai>=1.6.1",
     "torch>=2.1.0",
 ]
