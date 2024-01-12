@@ -1,9 +1,12 @@
 """
 Main agent class interacting with a user
 """
+import readline
+
 from typing import Any
 
 from groundcrew import agent_utils as autils, system_prompts as sp
+from groundcrew.dataclasses import Tool
 
 
 class Agent:
@@ -54,7 +57,7 @@ class Agent:
             print(response)
 
 
-    def choose_tool(self, user_prompt):
+    def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
         """
         Analyze the user's input and choose an appropriate tool for generating
         a response.

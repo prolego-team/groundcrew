@@ -6,11 +6,12 @@ import ast
 from git import Repo
 
 from groundcrew.constants import DEFAULT_EF
+from groundcrew.dataclasses import Chunk
 
 opj = os.path.join
 
 
-def format_chunk(chunk, include_text):
+def format_chunk(chunk: Chunk, include_text: bool) -> str:
 
     # TODO - change Document based on chunk type
     # TODO - start and end lines won't be needed if typ is a file
