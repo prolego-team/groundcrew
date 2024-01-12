@@ -2,10 +2,11 @@
 Embedding models and related functionality.
 """
 
+
+from typing import Any
+
 import torch
-
 import torch.nn.functional as F
-
 import transformers as tfs
 from transformers import AutoTokenizer, AutoModel
 
@@ -56,24 +57,14 @@ def e5_embeddings(
     return embeddings
 
 
-def e5_embeddings_windowed(
-        tokenizer: tfs.BertTokenizerFast,
-        model: tfs.BertModel,
-        text_batch: list[str],
+def create_windows(
+        batch_dict: dict[str, Any],
         window_tokens: int,
         overlap_tokens: int
-        ) -> torch.Tensor:
-    """
-    Get embeddings using an e5 tokenizer and model.
-    Calculates windows with a certain overlap amount.
-    """
+        ) -> dict[str, Any]:
+    """Expand a batch with overlapping windows."""
 
-    assert window_tokens <= 512
-
-    n_batch = len(text_batch)
-
-    # Tokenize the input texts
-    batch_dict = tokenizer(text_batch, max_length=None, padding=True, truncation=False, return_tensors='pt')
+    n_batch = batch_dict['input_ids'].shape[0]
 
     # make windows along the first dimension
     shape = batch_dict['input_ids'].shape
@@ -107,6 +98,46 @@ def e5_embeddings_windowed(
     for v in batch_dict.values():
         assert v.shape[0] == n_batch * n_chunks
 
+    return batch_dict
+
+
+def pivot_output(outputs: torch.Tensor, n_batch: int) -> torch.Tensor:
+    """
+    Pivot output from a batch of windows.
+    Output can be 2+ dimensions.
+    """
+    return torch.concat([
+        outputs[idx:idx + n_batch, ...]
+        for idx in range(0, outputs.shape[0], n_batch)
+    ], dim=1)
+
+
+def e5_embeddings_windowed(
+        tokenizer: tfs.BertTokenizerFast,
+        model: tfs.BertModel,
+        text_batch: list[str],
+        window_tokens: int,
+        overlap_tokens: int
+        ) -> torch.Tensor:
+    """
+    Get embeddings using an e5 tokenizer and model.
+    Calculates windows with a certain overlap amount.
+    """
+
+    assert window_tokens <= 512
+
+    n_batch = len(text_batch)
+
+    # Tokenize the input texts
+    batch_dict = tokenizer(text_batch, max_length=None, padding=True, truncation=False, return_tensors='pt')
+
+    for k, v in batch_dict.items():
+        print(k, v.dtype)
+
+    # shape = batch_dict['input_ids'].shape
+
+    batch_dict = create_windows(batch_dict, window_tokens, overlap_tokens)
+
     # run model
     with torch.no_grad():
         outputs = model(**batch_dict)
@@ -114,6 +145,8 @@ def e5_embeddings_windowed(
     outputs = outputs.last_hidden_state
     emb_dim = outputs.shape[2]
     attention_mask = batch_dict['attention_mask']
+
+    n_chunks = outputs.shape[0] // n_batch
 
     # before pivot
     assert outputs.shape == (n_batch * n_chunks, window_tokens, emb_dim)
@@ -123,15 +156,8 @@ def e5_embeddings_windowed(
     # outputs:        (n_batch * n_chunks) x window_size x emb_dim -> n_batch x (window_size * n_chunks) x emb_dim
     # attention_mask: (n_batch * n_chunks) x window_size           -> n_batch x (window_size * n_chunks)
 
-    outputs = torch.concat([
-        outputs[idx:idx + n_batch, :]
-        for idx in range(0, outputs.shape[0], n_batch)
-    ], dim=1)
-
-    attention_mask = torch.concat([
-        attention_mask[idx:idx + n_batch, :]
-        for idx in range(0, attention_mask.shape[0], n_batch)
-    ], dim=1)
+    outputs = pivot_output(outputs, n_batch)
+    attention_mask = pivot_output(attention_mask, n_batch)
 
     # after pivot
     assert outputs.shape == (n_batch, window_tokens * n_chunks, emb_dim)
