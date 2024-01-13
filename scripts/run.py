@@ -229,6 +229,9 @@ def main(config: str, model: str):
         llm)
     utils.save_tools_to_yaml(tools, tools_filepath)
 
+    # hack hack hack
+    tools['LinterTool'].obj.working_dir_path = config.repository
+
     agent = Agent(config, collection, llm, tools)
     agent.run()
 

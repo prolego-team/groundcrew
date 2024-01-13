@@ -1,6 +1,11 @@
 """
 """
 
+LINTER_PROMPT = """
+Use the linter output above to answer the following question in a few sentences.
+Do not engage in conversation.
+"""
+
 DOCSTRING_PROMPT = """ Your response must be formatted such that the first line is the function definition, and below it is the docstring. Do not engage in conversation or print any of the function's code. Do not include ```python or ``` in your response. If there are multiple functions, separate them by two newlines.
 """
 

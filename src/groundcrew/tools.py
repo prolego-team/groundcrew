@@ -4,6 +4,7 @@ File for Tools
 import os
 
 from abc import ABC, abstractmethod
+import subprocess
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
@@ -75,6 +76,43 @@ class ToolBase(ABC):
         The call method
         """
         pass
+
+
+class LinterTool(ToolBase):
+    """
+    Interact with a linter using natural language.
+    """
+
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """Constructor."""
+        super().__init__(base_prompt, collection, llm)
+        self.base_prompt = base_prompt + sp.LINTER_PROMPT
+        self.working_dir_path: str | None = None
+
+    def __call__(
+            self,
+            prompt: str,
+            filepath: str) -> str:
+        """
+        Answer questions using about linting results for a file.
+        Linters usually operate per file so this granularity makes sense.
+        """
+
+        # TODO: do a fuzzy match of some kind on the filepath to find an actual filepath
+
+        try:
+            command = ['ruff', '--preview',  filepath]
+            print(command)
+            print(self.working_dir_path)
+            linter_output = subprocess.check_output(command, cwd=self.working_dir_path)
+        except subprocess.CalledProcessError as e:
+            linter_output = e.output
+
+        linter_output = str(linter_output)
+
+        prompt = linter_output + '\n### Task ###\n' + self.base_prompt + '\n'
+
+        return self.llm(prompt)
 
 
 class SingleDocstringTool(ToolBase):
