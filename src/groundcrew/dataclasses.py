@@ -17,6 +17,8 @@ class Config:
     db_path: str
     cache_dir: str
     Tools: [str]
+    colorscheme: str
+    debug: bool
 
 
 @dataclass

@@ -1,13 +1,14 @@
 """
 Main agent class interacting with a user
 """
+import inspect
 import readline
 
 from typing import Any, Callable
 
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
-from groundcrew import agent_utils as autils, system_prompts as sp
+from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
 
 
@@ -54,7 +55,22 @@ class Agent:
                 user_prompt = 'What is the name of the function that finds pdfs in a directory?'
 
             tool, args = self.choose_tool(user_prompt)
-            response = tool.obj(user_prompt, **args)
+
+            # TODO - Make sure the tool is not None
+            # TODO - handle params that should be there but are not
+
+            tool_params = inspect.signature(tool.obj).parameters
+
+            # Filter out incorrect parametersd
+            new_args = {}
+            for param_name, val in args.items():
+                if param_name in tool_params:
+                    new_args[param_name] = val
+            args = new_args
+
+            response = utils.highlight_code(
+                tool.obj(user_prompt, **args),
+                self.config.colorscheme)
 
             print(response)
 
@@ -87,14 +103,14 @@ class Agent:
         tool = None
         while tool is None:
 
-            print(Colors.MAGENTA)
-            print(tool_prompt, Colors.ENDC, '\n')
-
             # Choose a Tool
             tool_response = self.llm(tool_prompt)
 
-            print(Colors.GREEN)
-            print(tool_response, Colors.ENDC)
+            if self.config.debug:
+                print(Colors.MAGENTA)
+                print(tool_prompt, Colors.ENDC, '\n')
+                print(Colors.GREEN)
+                print(tool_response, Colors.ENDC)
 
             # Parse Tool response
             parsed_tool_response = autils.parse_response(

@@ -26,8 +26,6 @@ Parameter_1: Parameter_1 Name | Variable_1 value | parameter type
 Parameter_N: Parameter_N Name | Variable_N value | parameter type
 """
 
-CODEBASE_QA_PROMPT = "Your task is to answer the question given the following data. Be descriptive in your answer and provide full filepaths and line numbers.\n"
-
 TOOL_GPT_PROMPT = """Your task is to take as input a Python `Tool` class and create a description of the `__call__` method in YAML format like the example below. All `Tools` will include a `prompt` parameter in the `__call__` method.
 
 Instructions:

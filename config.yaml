@@ -7,3 +7,5 @@ Tools:
     tools:
       - CodebaseQATool
       - SingleDocstringTool
+colorscheme: 'gruvbox-dark'
+debug: false
