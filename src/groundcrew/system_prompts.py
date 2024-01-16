@@ -24,7 +24,6 @@ Parameter_0: Parameter_0 Name | Variable_0 value | parameter type
 Parameter_1: Parameter_1 Name | Variable_1 value | parameter type
 ...
 Parameter_N: Parameter_N Name | Variable_N value | parameter type
-
 """
 
 CODEBASE_QA_PROMPT = "Your task is to answer the question given the following data. Be descriptive in your answer and provide full filepaths and line numbers.\n"

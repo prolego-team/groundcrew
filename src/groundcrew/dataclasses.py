@@ -81,3 +81,4 @@ class Colors:
     CYAN = '\033[36m'
     WHITE = '\033[37m'
     ENDC = '\033[0m'
+

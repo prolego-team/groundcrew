@@ -3,10 +3,12 @@ Main agent class interacting with a user
 """
 import readline
 
-from typing import Any
+from typing import Any, Callable
+
+from chromadb.api.models.Collection import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp
-from groundcrew.dataclasses import Colors
+from groundcrew.dataclasses import Colors, Config, Tool
 
 
 class Agent:
@@ -28,10 +30,10 @@ class Agent:
     """
     def __init__(
             self,
-            config,
-            collection,
-            llm,
-            tools):
+            config: Config,
+            collection: Collection,
+            llm: Callable,
+            tools: dict[str, Tool]):
         """
         Constructor
         """
@@ -48,18 +50,16 @@ class Agent:
         while True:
 
             user_prompt = input('> ')
-
-            # TODO - Just for testing, remove later
             if not user_prompt:
-                user_prompt = 'Generate the docstring for the function calculate_prompt_cost'
+                user_prompt = 'What is the name of the function that finds pdfs in a directory?'
+
             tool, args = self.choose_tool(user_prompt)
             response = tool.obj(user_prompt, **args)
 
-            print(Colors.GREEN)
-            print(response, Colors.ENDC)
+            print(response)
 
 
-    def choose_tool(self, user_prompt):
+    def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
         """
         Analyze the user's input and choose an appropriate tool for generating
         a response.
@@ -79,6 +79,7 @@ class Agent:
         base_prompt += '### Question ###\n'
         base_prompt += user_prompt + '\n\n'
 
+        # Put instructions at the end of the prompt
         base_prompt += sp.CHOOSE_TOOL_PROMPT
 
         tool_prompt = base_prompt

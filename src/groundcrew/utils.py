@@ -4,7 +4,7 @@ import os
 import ast
 import importlib
 
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 import astunparse
@@ -70,7 +70,7 @@ def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
         collection,
-        llm) -> dict[str, Tool]:
+        llm: Callable) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -113,7 +113,7 @@ def setup_tools(
                     print(f'Generating description for {node.name}...')
 
                     # Generate description of the Tool in YAML format
-                    tool_yaml = convert_tool_str_to_yaml(tool_code)
+                    tool_yaml = convert_tool_str_to_yaml(tool_code, llm)
 
                     # In case the LLM put ```yaml at the beginning and and ```
                     # at the end
@@ -140,7 +140,7 @@ def setup_tools(
     return tools
 
 
-def convert_tool_str_to_yaml(function_str: str) -> str:
+def convert_tool_str_to_yaml(function_str: str, llm: Callable) -> str:
     """
     Convert a given tool string to YAML format using a GPT-4 model.
 
@@ -150,9 +150,7 @@ def convert_tool_str_to_yaml(function_str: str) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
-    llm = build_llm_client()
-    return llm(prompt)
+    return llm(sp.TOOL_GPT_PROMPT + '\n\n' + function_str)
 
 
 def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
