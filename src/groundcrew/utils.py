@@ -9,28 +9,43 @@ from typing import Any, Callable
 import yaml
 import astunparse
 
-from openai import OpenAI
-
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
+from groundcrew.llm import openaiapi
 
 
-def build_llm_client(model: str='gpt-4-1106-preview'):
+def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], str]:
     """
 
     """
     if 'gpt' in model:
-        client = OpenAI()
+        client = openaiapi.get_openaiai_client()
+        chat_session = openaiapi.start_chat(model, client)
+
+        def chat(messages: list[dict[str, str]]) -> str:
+            messages_openai = [openaiapi.dict_to_message(message) for message in messages]
+            response = chat_session(messages_openai)
+            messages.append(response)
+            return openaiapi.message_to_dict(response)
+
+    return chat
+
+
+def build_llm_completion_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], str]:
+    """
+
+    """
+    if 'gpt' in model:
+        client = openaiapi.get_openaiai_client()
+        completion = openaiapi.start_chat(model, client)
 
         def chat_complete(prompt):
-            complete = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return complete.choices[0].message.content
+            messages = [
+                openaiapi.SystemMessage("You are a helpful assistant."),
+                openaiapi.UserMessage(prompt)
+            ]
+            response = completion(messages)
+            return response.content
 
     return chat_complete
 
@@ -184,4 +199,3 @@ def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
     with open(filename, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f'Saved {filename}\n')
-

@@ -32,15 +32,18 @@ class Agent:
             self,
             config: Config,
             collection: Collection,
-            llm: Callable,
+            chat_llm: Callable,
             tools: dict[str, Tool]):
         """
         Constructor
         """
         self.config = config
         self.collection = collection
-        self.llm = llm
+        self.llm = chat_llm
         self.tools = tools
+        self.messages = [
+            {'role': 'system', 'content': 'You are a helpful assistant.'}
+        ]
 
     def run(self):
         """
@@ -53,11 +56,12 @@ class Agent:
             if not user_prompt:
                 user_prompt = 'What is the name of the function that finds pdfs in a directory?'
 
+            self.messages.append({'role': 'user', 'content': user_prompt})
             tool, args = self.choose_tool(user_prompt)
             response = tool.obj(user_prompt, **args)
+            self.messages.append({'role': 'assistant', 'content': response})
 
             print(response)
-
 
     def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
         """
@@ -85,9 +89,10 @@ class Agent:
         while tool is None:
 
             # Choose a Tool
-            tool_response = self.llm(tool_prompt)
+            tool_messages = self.messages + [{'role': 'user', 'content': tool_prompt}]
+            tool_response = self.llm(tool_messages)
             parsed_tool_response = autils.parse_response(
-                tool_response, keywords=['Reason', 'Tool'])
+                tool_response['content'], keywords=['Reason', 'Tool'])
 
             if parsed_tool_response['Tool'] in self.tools:
                 tool = self.tools[parsed_tool_response['Tool']]
