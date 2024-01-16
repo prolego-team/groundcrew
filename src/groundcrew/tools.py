@@ -10,37 +10,41 @@ from groundcrew import code
 from groundcrew.dataclasses import Chunk
 
 
-class ToolBase(ABC):
+def query_codebase(
+        prompt: str, collection: Collection, n_results: int=5, where: dict=None):
     """
-    Abstract base class for tools that interact with a language model (LLM).
+    Queries the codebase for relevant code chunks based on a given prompt.
 
-    Attributes:
-        base_prompt (str): The base prompt used for interactions with the LLM.
-        collection (Collection): A chromaDB collection
-        llm (Callable): The language model instance used for generating
-        responses.
+    Args:
+        prompt (str): The prompt to query the codebase.
+        n_results (int, optional): The number of results to return.
+        Defaults to 5.
 
-    Methods:
-        __call__(prompt: str, **kwargs): Abstract method to be implemented in
-        subclasses.
+    Returns:
+        list: A list of code chunks relevant to the prompt.
     """
-    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
-        """
-        Constructor
-        """
-        self.base_prompt = base_prompt
-        self.collection = collection
-        self.llm = llm
+    out = collection.query(
+        query_texts=[prompt],
+        n_results=n_results,
+        where=where
+    )
 
-    @abstractmethod
-    def __call__(self, prompt: str, **kwargs):
-        """
-        The call method
-        """
-        pass
+    return [
+        Chunk(
+            uid=metadata['id'],
+            typ=metadata['type'],
+            text=metadata['text'],
+            document=doc,
+            filepath=metadata['filepath'],
+            start_line=metadata['start_line'],
+            end_line=metadata['end_line']
+        ) for id_, metadata, doc in zip(
+            out['ids'][0], out['metadatas'][0], out['documents'][0]
+            )
+    ]
 
 
-class CodebaseQATool(ToolBase):
+class CodebaseQATool:
     """
     Tool for querying a codebase and generating responses using a language
     model.  Inherits from ToolBase and implements the abstract methods for
@@ -58,9 +62,11 @@ class CodebaseQATool(ToolBase):
             llm (Callable): The language model to use for generating
             code-related responses.
         """
-        super().__init__(base_prompt, collection, llm)
+        self.base_prompt = base_prompt
+        self.collection = collection
+        self.llm = llm
 
-    def __call__(self, prompt: str, include_code: bool):
+    def __call__(self, prompt: str, include_code: bool) -> str:
         """
         Processes a given prompt, queries the codebase, and uses the language
         model to generate a response.
@@ -72,7 +78,7 @@ class CodebaseQATool(ToolBase):
         Returns:
             str: The generated response from the language model.
         """
-        chunks = self.query_codebase(prompt)
+        chunks = query_codebase(prompt, self.collection)
 
         prompt = self.base_prompt + '### Question ###\n'
         prompt += f'{prompt}\n\n'
@@ -83,35 +89,4 @@ class CodebaseQATool(ToolBase):
 
         return self.llm(prompt)
 
-    def query_codebase(self, prompt: str, n_results: int=5):
-        """
-        Queries the codebase for relevant code chunks based on a given prompt.
-
-        Args:
-            prompt (str): The prompt to query the codebase.
-            n_results (int, optional): The number of results to return.
-            Defaults to 5.
-
-        Returns:
-            list: A list of code chunks relevant to the prompt.
-        """
-        out = self.collection.query(
-            query_texts=[prompt],
-            n_results=n_results,
-            #where={'type': 'function'} # TODO - might want the LLM to choose which types to query
-        )
-
-        return [
-            Chunk(
-                uid=metadata['id'],
-                typ=metadata['type'],
-                text=metadata['text'],
-                document=doc,
-                filepath=metadata['filepath'],
-                start_line=metadata['start_line'],
-                end_line=metadata['end_line']
-            ) for id_, metadata, doc in zip(
-                out['ids'][0], out['metadatas'][0], out['documents'][0]
-                )
-        ]
 

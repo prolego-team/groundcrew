@@ -198,6 +198,10 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
+        if 'test' in filepath:
+            continue
+        if 'agent.py' not in filepath:
+            continue
         summarize_file(filepath, llm, descriptions)
 
     # Save the descriptions to a file in the cache directory
