@@ -29,7 +29,6 @@ def highlight_code(text: str, colorscheme: str) -> str:
     code = ''
     if '```python' in text:
         code = text.split('```python')[1].split('```')[0]
-
         code = highlight(
             code,
             PythonLexer(),
