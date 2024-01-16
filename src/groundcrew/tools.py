@@ -1,10 +1,9 @@
 """
 File for Tools
 """
-from abc import ABC, abstractmethod
 from typing import Callable
 
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import code
 from groundcrew.dataclasses import Chunk

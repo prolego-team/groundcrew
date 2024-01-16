@@ -11,7 +11,7 @@ import yaml
 import astunparse
 
 from openai import OpenAI
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
