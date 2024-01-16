@@ -3,10 +3,12 @@ Main agent class interacting with a user
 """
 import readline
 
-from typing import Any
+from typing import Any, Callable
+
+from chromadb.api.models.Collection import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp
-from groundcrew.dataclasses import Tool
+from groundcrew.dataclasses import Config, Tool
 
 
 class Agent:
@@ -28,10 +30,10 @@ class Agent:
     """
     def __init__(
             self,
-            config,
-            collection,
-            llm,
-            tools):
+            config: Config,
+            collection: Collection,
+            llm: Callable,
+            tools: dict[str, Tool]):
         """
         Constructor
         """

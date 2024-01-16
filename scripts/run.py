@@ -200,10 +200,6 @@ def main(config: str, model: str):
         filepath = opj(config.repository, filepath)
         summarize_file(filepath, llm, descriptions)
 
-        # TODO - remove before merging
-        if i > 5:
-            break
-
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:
         pickle.dump(descriptions, f)

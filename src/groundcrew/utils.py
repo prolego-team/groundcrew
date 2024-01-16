@@ -70,7 +70,7 @@ def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
         collection,
-        llm) -> dict[str, Tool]:
+        llm: Callable) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
