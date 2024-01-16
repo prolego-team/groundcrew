@@ -7,4 +7,4 @@ Tools:
     tools:
       - CodebaseQATool
       - SingleDocstringTool
-      - LinterTool
+      - LintFileTool
