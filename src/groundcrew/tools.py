@@ -7,6 +7,7 @@ from abc import ABC, abstractmethod
 import subprocess
 from typing import Callable
 
+from thefuzz import process as fuzzprocess
 from chromadb.api.models.Collection import Collection
 
 from groundcrew import code, system_prompts as sp
@@ -78,7 +79,7 @@ class ToolBase(ABC):
         pass
 
 
-class LinterTool(ToolBase):
+class LintFileTool(ToolBase):
     """
     Interact with a linter using natural language.
     """
@@ -92,13 +93,48 @@ class LinterTool(ToolBase):
     def __call__(
             self,
             prompt: str,
-            filepath: str) -> str:
+            filepath_inexact: str) -> str:
         """
         Answer questions using about linting results for a file.
+        filepath_inexact is a file path which can be inexact, it will be fuzzy
+        matched to find an exact file path for the project.
         Linters usually operate per file so this granularity makes sense.
         """
 
-        # TODO: do a fuzzy match of some kind on the filepath to find an actual filepath
+        print('filepath_inexact:', filepath_inexact)
+
+        # ensure that filepath is a real path of a file in the collection
+        # TODO: figure out what the correct threshold is here
+        filepath = self.fuzzy_match_file_path(filepath_inexact, 50)
+
+        if filepath is None:
+            return f'Could not find a source file matching `{filepath}`'
+
+        print('filepath (exact):', filepath)
+
+        linter_output = self.run_ruff(filepath)
+
+        if not linter_output:
+            linter_output = 'Linter did not find any issues.'
+
+        print('---- ---- ----')
+        print('linter output:')
+        print(linter_output)
+        print('---- ---- ----')
+
+        prompt = (
+            linter_output +
+            '\n### Task ###\n' + self.base_prompt +
+            '\n### Question ###\n' + prompt + '\n'
+        )
+
+        return self.llm(prompt)
+
+    def run_ruff(self, filepath: str) -> str:
+        """
+        Run ruff on a file and capture the output.
+        Filter some of the output like comments about things being fixable with `--fix`.
+        """
 
         try:
             command = ['ruff', '--preview',  filepath]
@@ -108,11 +144,41 @@ class LinterTool(ToolBase):
         except subprocess.CalledProcessError as e:
             linter_output = e.output
 
-        linter_output = str(linter_output)
+        linter_output = linter_output.decode()
 
-        prompt = linter_output + '\n### Task ###\n' + self.base_prompt + '\n'
+        linter_output = [
+            x for x in linter_output.split('\n')
+            if not x.startswith('[*]')
+        ]
 
-        return self.llm(prompt)
+        return '\n'.join(linter_output)
+
+    def fuzzy_match_file_path(self, search: str, thresh: int) -> str | None:
+        """find a real file path in a collection given an example"""
+
+        # there's a limited number of metadata filter options in chroma
+        # so we'll grab everything and manufally filter
+
+        # get all paths and ids
+        all_entries = self.collection.get(
+            include=['metadatas']
+        )
+
+        paths_ids = [
+            (x['filepath'], y)
+            for x, y in zip(all_entries['metadatas'], all_entries['ids'])
+        ]
+
+        # fuzzy match on filepaths
+        top, thresh_match = fuzzprocess.extractOne(search, [x[0] for x in paths_ids])
+
+        # it might be possible to do something where we fuzzy match on ids instead
+        # and then we could filter result lines by chunk
+
+        if thresh_match < thresh:
+            return None
+        else:
+            return top
 
 
 class SingleDocstringTool(ToolBase):

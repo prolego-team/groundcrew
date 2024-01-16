@@ -51,7 +51,13 @@ class Agent:
 
             # TODO - Just for testing, remove later
             if not user_prompt:
-                user_prompt = 'Generate the docstring for the function calculate_prompt_cost'
+                #  user_prompt = 'Generate the docstring for the function calculate_prompt_cost'
+                # user_prompt = 'What are some linting issues with src/neosophia/agents/utils.py'
+                user_prompt = 'What are some linting issues with agents utils?'
+
+            if user_prompt == 'q':
+                break
+
             tool, args = self.choose_tool(user_prompt)
             response = tool.obj(user_prompt, **args)
 
