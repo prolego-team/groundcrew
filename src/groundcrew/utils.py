@@ -2,6 +2,7 @@
 """
 import os
 import ast
+import inspect
 import importlib
 
 from typing import Any, Callable
@@ -10,6 +11,7 @@ import yaml
 import astunparse
 
 from openai import OpenAI
+from chromadb import Collection
 
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
@@ -69,7 +71,7 @@ def setup_and_load_yaml(filepath: str, key: str) -> dict[str, dict[str, Any]]:
 def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
-        collection,
+        collection: Collection,
         llm: Callable) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
@@ -84,8 +86,13 @@ def setup_tools(
     Returns:
         tools (dict): A dictionary containing Tools with each key being the
         tool name
-
     """
+
+    # Parameters available to a tool constructor
+    params = {
+        'collection': collection,
+        'llm': llm
+    }
 
     tools = {}
     for module_dict in modules_list:
@@ -125,10 +132,25 @@ def setup_tools(
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
 
-                # Create an instance of the Tool object
-                tool_obj = getattr(module, node.name)(
-                    tool_info_dict['base_prompt'], collection, llm)
+                params['base_prompt'] = tool_info_dict['base_prompt']
 
+                tool_constructor = getattr(module, node.name)
+                tool_params = inspect.signature(tool_constructor).parameters
+
+                args = {}
+                for param_name, value in params.items():
+                    if param_name in tool_params:
+                        args[param_name] = value
+
+                # Create an instance of a tool object
+                tool_obj = tool_constructor(**args)
+
+                # Check that the tool object has the correct signature
+                assert 'prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a prompt parameter'
+
+                assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
+
+                # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
                     name=node.name,
                     code=tool_code,
