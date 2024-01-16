@@ -1,85 +1,72 @@
 """
+Main run script
 """
 import os
+import ast
 import pickle
 
-from typing import Dict, List
+from typing import Callable
 
 import yaml
 import click
-
 import chromadb
 
-from openai import OpenAI
+from chromadb.api.models.Collection import Collection
 
-from groundcrew.code import (extract_python_functions_from_file,
-                             generate_function_descriptions, init_db)
+from groundcrew import system_prompts as sp, utils
+from groundcrew.code import extract_python_from_file, init_db
 from groundcrew.agent import Agent
 from groundcrew.dataclasses import Config
 
 opj = os.path.join
+CLASS_NODE_TYPE = ast.ClassDef
+FUNCTION_NODE_TYPE = ast.FunctionDef
 
 
-def build_llm_client(model):
+def populate_db(descriptions: dict[str, str], collection: Collection):
+    """
+    Populate a database with metadata and descriptions of Python functions
+    extracted from a list of files.
 
-    if 'gpt' in model:
-        client = OpenAI()
-
-        def chat_complete(prompt):
-            complete = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return complete.choices[0].message.content
-
-    return chat_complete
-
-
-def populate_db(
-        repository: str,
-        files: List[str],
-        function_descriptions: Dict,
-        collection):
-
+    Args:
+        descriptions (dict): A dictionary mapping file, function, or class
+        identifiers to their LLM generated descriptions.
+        collection (object): The database collection where data is to be
+        upserted.
+    """
     ids = []
     metadatas = []
     documents = []
-    for file in files:
-        filepath = opj(repository, file)
 
-        # TODO - refactor to make more general
-        if not filepath.endswith('.py'):
-            continue
+    # Create ids, metadata, and documents
+    # Name is a unique identifier
+    for name, info in descriptions.items():
 
-        file_functions = extract_python_functions_from_file(filepath)
-        for function_name, function_info in file_functions.items():
+        # Choose the correct data type
+        data_type = 'file'
+        if name.endswith(' (class)'):
+            data_type = 'class'
+        elif name.endswith(' (function)'):
+            data_type = 'function'
 
-            function_text = function_info['text']
-            start_line = function_info['start_line']
-            end_line = function_info['end_line']
+        filepath = name.split('::')[0]
 
-            function_id = file + '::' + function_name
+        # Create metadata
+        metadata = {
+            'type': data_type,
+            'id': name,
+            'filepath': filepath,
+            'text': info['text'],
+            'start_line': info['start_line'],
+            'end_line': info['end_line'],
+            'summary': info['summary']
+        }
 
-            function_description = function_descriptions.get(function_id)
-            if function_description is None:
-                continue
+        ids.append(name)
+        metadatas.append(metadata)
 
-            metadata = {
-                'type': 'function',
-                'name': function_name,
-                'id': function_id,
-                'filepath': file,
-                'function_text': function_text,
-                'start_line': start_line,
-                'end_line': end_line
-            }
-
-            ids.append(function_id)
-            metadatas.append(metadata)
-            documents.append(function_description)
+        # The document is the LLM generated summary
+        documents.append(info['summary'])
 
     collection.upsert(
         documents=documents,
@@ -88,14 +75,99 @@ def populate_db(
     )
 
 
+def summarize_file(
+        filepath: str,
+        llm: Callable,
+        descriptions: dict):
+    """
+    Function to summarize a file. If the file is a python file, it will search
+    for functions and classes and summarize those as well.
+    """
+
+    # TODO - skip file if there are too many tokens
+
+    code_dict = {}
+
+    # Get the file text
+    with open(filepath, 'r') as f:
+        file_text = ''.join(f.readlines())
+
+    # If it's a Python file also extract classes and functions
+    if filepath.endswith('.py'):
+
+        # Summarize entire Python file
+        if filepath not in descriptions:
+            print('Generating summary for', filepath, '...')
+            prompt = filepath + '\n\n' + file_text + '\n\n'
+            prompt += sp.SUMMARIZE_CODE_PROMPT
+            file_summary = llm(prompt)
+            descriptions[filepath] = {
+                'text': file_text,
+                'start_line': 1,
+                'end_line': len(file_text.split('\n')),
+                'summary': file_summary
+            }
+        else:
+            print('Loading summary for', filepath, '...')
+
+        # Extract classes and functions
+        classes_dict = extract_python_from_file(file_text, CLASS_NODE_TYPE)
+        functions_dict = extract_python_from_file(file_text, FUNCTION_NODE_TYPE)
+
+        classes_dict = {k + ' (class)': v for k, v in classes_dict.items()}
+        functions_dict = {
+            k + ' (function)': v for k, v in functions_dict.items()
+        }
+
+        # Combine classes and functions dictionaries
+        code_dict = {**classes_dict, **functions_dict}
+
+        # Generate summaries for classes and functions
+        for name, info in code_dict.items():
+
+            key = filepath + '::' + name
+
+            if key not in descriptions:
+                print('Generating summary for', key, '...')
+                prompt = filepath + '\n\n' + info['text'] + '\n\n'
+                prompt += sp.SUMMARIZE_CODE_PROMPT
+                info['summary'] = llm(prompt)
+                descriptions[key] = info
+            else:
+                print('Loading summary for', key)
+
+    # Not a Python file
+    else:
+        key = filepath
+        if key not in descriptions:
+            print('Generating summary for', key, '...')
+            prompt = filepath + '\n\n' + file_text + '\n\n'
+            prompt += sp.SUMMARIZE_FILE_PROMPT
+            file_summary = llm(prompt)
+            descriptions[key] = {
+                'text': file_text,
+                'start_line': 1,
+                'end_line': len(file_text.split('\n')),
+                'summary': file_summary
+            }
+        else:
+            print('Loading summary for', key)
+
+
 @click.command()
 @click.option('--config', '-c', default='config.yaml')
-@click.option('--model', '-m', default='gpt-3.5-turbo')
-def main(config, model):
+@click.option('--model', '-m', default='gpt-4-1106-preview')
+def main(config: str, model: str):
+    """
+    Main run script
+
+    Args:
+        config (str): Path to the config yaml file
+        model (str): The name of the LLM model to use
+    """
 
     with open(config, 'r') as f:
         config = yaml.safe_load(f)
-
     config = Config(**config)
 
     # Directory to store generated file and function descriptions
@@ -105,44 +177,50 @@ def main(config, model):
     client = chromadb.PersistentClient(config.db_path)
 
     # Initialize the database and get a list of files in the repo
-    collection, files = init_db(client, config.repository)
+    collection, files = init_db(client, config.repository, config.extensions)
+    files = sorted(files)
 
     # LLM that takes a string as input and returns a string
-    llm = build_llm_client(model)
+    llm = utils.build_llm_client(model)
 
-    # File for storing LLM generated descriptions
-    function_descriptions_file = opj(
-        config.cache_dir, 'function_descriptions.pkl')
+    # File for storing LLM generated descriptions of files, functions, and
+    # classes
+    descriptions_file = opj(config.cache_dir, 'descriptions.pkl')
 
-    if os.path.exists(function_descriptions_file):
-        with open(function_descriptions_file, 'rb') as f:
-            function_descriptions = pickle.load(f)
-    else:
-        # TODO - also run this if we want to force update descriptions
-        function_descriptions = generate_function_descriptions(
-            llm=llm,
-            function_descriptions={},
-            repository=config.repository,
-            files=files
-        )
+    # Dictionary storing LLM generated summaries.
+    # If the file is a Python file, key will be filename :: class/function name
+    # If the file is not a Python file, key will be the filename
+    descriptions = {}
+    if os.path.exists(descriptions_file):
+        with open(descriptions_file, 'rb') as f:
+            descriptions = pickle.load(f)
 
-        with open(function_descriptions_file, 'wb') as f:
-            pickle.dump(function_descriptions, f)
+    # Generate summaries for files, classes, and functions
+    for i, filepath in enumerate(files):
+        filepath = opj(config.repository, filepath)
+        summarize_file(filepath, llm, descriptions)
+
+    # Save the descriptions to a file in the cache directory
+    with open(descriptions_file, 'wb') as f:
+        pickle.dump(descriptions, f)
 
     # Populate the database with the files and descriptions
     populate_db(
-        config.repository,
-        files,
-        function_descriptions,
+        descriptions,
         collection
     )
 
-    print('FUNCTIONS')
-    print(function_descriptions.keys())
-    print('\n')
+    # Load or generate Tools
+    tools_filepath = opj(config.cache_dir, 'tools.yaml')
+    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
+    tools = utils.setup_tools(
+        config.Tools,
+        tool_descriptions,
+        collection,
+        llm)
+    utils.save_tools_to_yaml(tools, tools_filepath)
 
-    agent = Agent(config, collection, llm)
-
+    agent = Agent(config, collection, llm, tools)
     agent.run()
 
 
