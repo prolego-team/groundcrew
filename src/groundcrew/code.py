@@ -121,15 +121,14 @@ def find_object_use(
             continue
 
         function_calls = [
-            line.strip()
-            for line in file_text.split('\n')
-            if function_call in line
+            (line_no, line.strip())
+            for line_no,line in enumerate(file_text.split('\n'))
+            if function_call in line and 'import' not in line
         ]
         if len(function_calls) > 0:
             function_use[file] = function_calls
 
     return function_use
-
 
 
 def init_db(client: chromadb.Client, repository: str) -> tuple[chromadb.Collection, list[str]]:

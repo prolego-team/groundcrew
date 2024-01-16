@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
+from radon.visitors import ComplexityVisitor
 
 from groundcrew import code
 from groundcrew.dataclasses import Chunk
@@ -114,4 +115,28 @@ class CodebaseQATool(ToolBase):
                 out['ids'][0], out['metadatas'][0], out['documents'][0]
                 )
         ]
+
+
+def cyclomatic_complexity(code: str) -> dict:
+    """Compute the cyclomatic complexity of a piece of code."""
+    v = ComplexityVisitor.from_code(code)
+    output = {}
+    for func in v.functions:
+        output[func.name] = {
+            'object': 'function',
+            'complexity': func.complexity
+        }
+
+    for clss in v.classes:
+        output[clss.name] = {
+            'object': 'class',
+            'complexity': clss.complexity,
+            'methods': {}
+        }
+        for meth in clss.methods:
+            output[clss.name]['methods'][meth.name] = {
+                'complexity': meth.complexity
+            }
+
+    return output
 

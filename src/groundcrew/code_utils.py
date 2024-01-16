@@ -1,4 +1,3 @@
-from typing import Literal
 import ast
 
 from dataclasses import dataclass
