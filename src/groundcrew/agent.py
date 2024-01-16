@@ -50,9 +50,10 @@ class Agent:
         """
         while True:
 
-            user_prompt = input('> ')
-            if not user_prompt:
-                user_prompt = 'What is the name of the function that finds pdfs in a directory?'
+            user_prompt = ''
+
+            while user_prompt == '':
+                user_prompt = input('> ')
 
             tool, args = self.choose_tool(user_prompt)
 
