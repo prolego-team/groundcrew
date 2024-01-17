@@ -11,7 +11,7 @@ import yaml
 import click
 import chromadb
 
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import system_prompts as sp, utils
 from groundcrew.code import extract_python_from_file, init_db
@@ -68,6 +68,8 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
         # The document is the LLM generated summary
         documents.append(info['summary'])
 
+        break
+
     collection.upsert(
         documents=documents,
         metadatas=metadatas,
@@ -115,9 +117,14 @@ def summarize_file(
         functions_dict = extract_python_from_file(file_text, FUNCTION_NODE_TYPE)
 
         classes_dict = {k + ' (class)': v for k, v in classes_dict.items()}
-        functions_dict = {
-            k + ' (function)': v for k, v in functions_dict.items()
-        }
+
+        new_functions_dict = {}
+        for k, v in functions_dict.items():
+            suffix = ' (function)'
+            if v['is_method']:
+                suffix = ' (method)'
+            new_functions_dict[k + suffix] = v
+        functions_dict = new_functions_dict
 
         # Combine classes and functions dictionaries
         code_dict = {**classes_dict, **functions_dict}
@@ -134,6 +141,8 @@ def summarize_file(
                 info['summary'] = llm(prompt)
                 descriptions[key] = info
             else:
+                info['summary'] = descriptions[key]['summary']
+                descriptions[key] = info
                 print('Loading summary for', key)
 
     # Not a Python file
@@ -208,6 +217,9 @@ def main(config: str, model: str):
             continue
         if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
             summarize_file(filepath, llm, descriptions)
+
+        if i > 3:
+            break
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:

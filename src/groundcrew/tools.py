@@ -3,80 +3,48 @@ File for Tools
 """
 import os
 
-from abc import ABC, abstractmethod
 import subprocess
 from typing import Callable
 
 from thefuzz import process as fuzzprocess
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import code, system_prompts as sp
 from groundcrew.dataclasses import Chunk
 
 
-class ToolBase(ABC):
+def query_codebase(
+        prompt: str, collection: Collection, n_results: int=5, where: dict=None):
     """
-    Abstract base class for tools that interact with a language model (LLM).
+    Queries the codebase for relevant code chunks based on a given prompt.
 
-    Attributes:
-        base_prompt (str): The base prompt used for interactions with the LLM.
-        collection (Collection): A chromaDB collection
-        llm (Callable): The language model instance used for generating
-        responses.
+    Args:
+        prompt (str): The prompt to query the codebase.
+        n_results (int, optional): The number of results to return.
+        Defaults to 5.
 
-    Methods:
-        __call__(prompt: str, **kwargs): Abstract method to be implemented in
-        subclasses.
+    Returns:
+        list: A list of code chunks relevant to the prompt.
     """
-    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
-        """
-        Constructor
-        """
-        self.base_prompt = base_prompt
-        self.collection = collection
-        self.llm = llm
+    out = collection.query(
+        query_texts=[prompt],
+        n_results=n_results,
+        where=where
+    )
 
-    def get_filename_from_id(self, id_: str):
-        return os.path.basename(id_.split('::')[0])
-
-    def query_codebase(self, prompt: str, n_results: int=5, where: dict=None):
-        """
-        Queries the codebase for relevant code chunks based on a given prompt.
-
-        Args:
-            prompt (str): The prompt to query the codebase.
-            n_results (int, optional): The number of results to return.
-            Defaults to 5.
-
-        Returns:
-            list: A list of code chunks relevant to the prompt.
-        """
-        out = self.collection.query(
-            query_texts=[prompt],
-            n_results=n_results,
-            where=where
-        )
-
-        return [
-            Chunk(
-                uid=metadata['id'],
-                typ=metadata['type'],
-                text=metadata['text'],
-                document=doc,
-                filepath=metadata['filepath'],
-                start_line=metadata['start_line'],
-                end_line=metadata['end_line']
-            ) for id_, metadata, doc in zip(
-                out['ids'][0], out['metadatas'][0], out['documents'][0]
-                )
-        ]
-
-    @abstractmethod
-    def __call__(self, prompt: str, **kwargs):
-        """
-        The call method
-        """
-        pass
+    return [
+        Chunk(
+            uid=metadata['id'],
+            typ=metadata['type'],
+            text=metadata['text'],
+            document=doc,
+            filepath=metadata['filepath'],
+            start_line=metadata['start_line'],
+            end_line=metadata['end_line']
+        ) for id_, metadata, doc in zip(
+            out['ids'][0], out['metadatas'][0], out['documents'][0]
+            )
+    ]
 
 
 class LintFileTool(ToolBase):
@@ -181,7 +149,11 @@ class LintFileTool(ToolBase):
             return top
 
 
-class SingleDocstringTool(ToolBase):
+def get_filename_from_id(id_: str):
+    return os.path.basename(id_.split('::')[0])
+
+
+class SingleDocstringTool:
     """
     """
     def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
@@ -196,16 +168,18 @@ class SingleDocstringTool(ToolBase):
             llm (Callable): The language model to use for generating
             code-related responses.
         """
-        super().__init__(base_prompt, collection, llm)
+        self.base_prompt = base_prompt
+        self.collection = collection
+        self.llm = llm
 
         # Adding additional instructions
         self.base_prompt = base_prompt + sp.DOCSTRING_PROMPT
 
     def __call__(
             self,
-            prompt: str,
+            user_prompt: str,
             filename: str = None,
-            function_name: str = None):
+            function_name: str = None) -> str:
         """
         Generate docstrings for a given function, or all functions in a given
         file.
@@ -242,11 +216,11 @@ class SingleDocstringTool(ToolBase):
             for id_ in all_ids:
 
                 # This will match with all functions in the given file
-                if all_functions and '::' in id_ and self.get_filename_from_id(id_) == filename:
+                if all_functions and '::' in id_ and get_filename_from_id(id_) == filename:
                     filtered_ids.append(id_)
 
                 # This will match with a single function in the given file
-                elif not all_functions and f'::{function_name}' in id_ and self.get_filename_from_id(id_) == filename:
+                elif not all_functions and f'::{function_name}' in id_ and get_filename_from_id(id_) == filename:
                     filtered_ids.append(id_)
 
         # No filename was given, find the function(s) given
@@ -271,7 +245,7 @@ class SingleDocstringTool(ToolBase):
         return self.llm(prompt)
 
 
-class CodebaseQATool(ToolBase):
+class CodebaseQATool:
     """
     Tool for querying a codebase and generating responses using a language
     model.  Inherits from ToolBase and implements the abstract methods for
@@ -289,9 +263,11 @@ class CodebaseQATool(ToolBase):
             llm (Callable): The language model to use for generating
             code-related responses.
         """
-        super().__init__(base_prompt, collection, llm)
+        self.base_prompt = base_prompt
+        self.collection = collection
+        self.llm = llm
 
-    def __call__(self, prompt: str, include_code: bool):
+    def __call__(self, user_prompt: str, include_code: bool) -> str:
         """
         Processes a given prompt, queries the codebase, and uses the language
         model to generate a response.
@@ -303,14 +279,18 @@ class CodebaseQATool(ToolBase):
         Returns:
             str: The generated response from the language model.
         """
-        chunks = self.query_codebase(prompt)
+        chunks = query_codebase(user_prompt, self.collection)
 
-        prompt = self.base_prompt + '### Question ###\n'
-        prompt += f'{prompt}\n\n'
-
+        prompt = ''
         for chunk in chunks:
+            #print(chunk.text)
+            #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
-        return self.llm(prompt)
+        prompt += self.base_prompt + '\n### Question ###\n'
+        prompt += f'{user_prompt}\n\n'
 
+        print(prompt)
+
+        return self.llm(prompt)

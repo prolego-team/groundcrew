@@ -17,6 +17,8 @@ class Config:
     db_path: str
     cache_dir: str
     Tools: [str]
+    colorscheme: str
+    debug: bool
 
 
 @dataclass
@@ -81,3 +83,4 @@ class Colors:
     CYAN = '\033[36m'
     WHITE = '\033[37m'
     ENDC = '\033[0m'
+

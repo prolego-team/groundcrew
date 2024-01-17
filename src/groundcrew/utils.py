@@ -2,17 +2,39 @@
 """
 import os
 import ast
+import inspect
 import importlib
 
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 import astunparse
 
 from openai import OpenAI
+from chromadb import Collection
+
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import Terminal256Formatter
 
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
+
+
+def highlight_code(text: str, colorscheme: str) -> str:
+
+    start_idx = text.find('```python')
+    end_idx = text.find('```', start_idx + 1)
+
+    code = ''
+    if '```python' in text:
+        code = text.split('```python')[1].split('```')[0]
+        code = highlight(
+            code,
+            PythonLexer(),
+            Terminal256Formatter(style=colorscheme, background='dark'))
+
+    return text[:start_idx] + code + text[end_idx + 3:]
 
 
 def build_llm_client(model: str='gpt-4-1106-preview'):
@@ -69,8 +91,8 @@ def setup_and_load_yaml(filepath: str, key: str) -> dict[str, dict[str, Any]]:
 def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
-        collection,
-        llm) -> dict[str, Tool]:
+        collection: Collection,
+        llm: Callable) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -84,8 +106,13 @@ def setup_tools(
     Returns:
         tools (dict): A dictionary containing Tools with each key being the
         tool name
-
     """
+
+    # Parameters available to a tool constructor
+    params = {
+        'collection': collection,
+        'llm': llm
+    }
 
     tools = {}
     for module_dict in modules_list:
@@ -113,7 +140,7 @@ def setup_tools(
                     print(f'Generating description for {node.name}...')
 
                     # Generate description of the Tool in YAML format
-                    tool_yaml = convert_tool_str_to_yaml(tool_code)
+                    tool_yaml = convert_tool_str_to_yaml(tool_code, llm)
 
                     # In case the LLM put ```yaml at the beginning and and ```
                     # at the end
@@ -125,10 +152,25 @@ def setup_tools(
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
 
-                # Create an instance of the Tool object
-                tool_obj = getattr(module, node.name)(
-                    tool_info_dict['base_prompt'], collection, llm)
+                params['base_prompt'] = tool_info_dict['base_prompt']
 
+                tool_constructor = getattr(module, node.name)
+                tool_params = inspect.signature(tool_constructor).parameters
+
+                args = {}
+                for param_name, value in params.items():
+                    if param_name in tool_params:
+                        args[param_name] = value
+
+                # Create an instance of a tool object
+                tool_obj = tool_constructor(**args)
+
+                # Check that the tool object has the correct signature
+                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a prompt parameter'
+
+                assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
+
+                # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
                     name=node.name,
                     code=tool_code,
@@ -140,7 +182,7 @@ def setup_tools(
     return tools
 
 
-def convert_tool_str_to_yaml(function_str: str) -> str:
+def convert_tool_str_to_yaml(function_str: str, llm: Callable) -> str:
     """
     Convert a given tool string to YAML format using a GPT-4 model.
 
@@ -150,9 +192,7 @@ def convert_tool_str_to_yaml(function_str: str) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
-    llm = build_llm_client()
-    return llm(prompt)
+    return llm(sp.TOOL_GPT_PROMPT + '\n\n' + function_str)
 
 
 def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
