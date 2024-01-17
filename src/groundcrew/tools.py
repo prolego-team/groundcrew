@@ -47,6 +47,15 @@ def query_codebase(
 
 
 def get_filename_from_id(id_: str):
+    """
+    Gets the filename from the ID used in the database.
+
+    Args:
+        id_ (str): The ID to parse.
+
+    Returns:
+        str: The filename.
+    """
     return os.path.basename(id_.split('::')[0])
 
 
@@ -75,20 +84,21 @@ class SingleDocstringTool:
     def __call__(
             self,
             user_prompt: str,
-            filename: str = None,
-            function_name: str = None) -> str:
+            filename: str = 'none',
+            function_name: str = 'none') -> str:
         """
         Generate docstrings for a given function, or all functions in a given
         file.
 
         Scenarios:
-            - filename is not None, function_name is None: generate docstrings
-              for all functions in the file
-            - filename is not None, function_name is not None: generate
-              docstring for single function in the file
-            - filename is None, function_name is not None: generate docstring
-              for single function
-
+            - filename is not 'none', function_name is 'none': generate
+              docstrings for all functions in the file
+            - filename is not 'none', function_name is not 'none': search for
+              the correct function in the correct file and generate docstrings
+            - filename is 'none', function_name is not 'none': search for the
+              correct function in the database and generate docstring
+            - filename is 'none', function_name is 'none': assumes the
+              user_prompt includes code and generates the docstring for that
         Args:
             prompt (str): The prompt to process.
             filename (str): A filename to query and generate docstrings for all
@@ -104,7 +114,7 @@ class SingleDocstringTool:
 
         # Flag for generating docstrings for all functions in a file
         all_functions = False
-        if function_name == 'none' or function_name is None:
+        if function_name == 'none':
             all_functions = True
 
         # IDs of the files/functions to generate docstrings for
@@ -121,7 +131,7 @@ class SingleDocstringTool:
                     filtered_ids.append(id_)
 
         # No filename was given, find the function(s) given
-        elif filename == 'none':
+        elif filename == 'none' and function_name != 'none':
             for id_ in all_ids:
 
                 # If '::' isn't in the ID then it's a file
@@ -131,10 +141,14 @@ class SingleDocstringTool:
                 if function_name in id_:
                     filtered_ids.append(id_)
 
-        function_code = []
-        for id_ in filtered_ids:
-            item = self.collection.get(id_)
-            function_code.append(item['metadatas'][0]['text'] + '\n')
+        # User included code in their prompt so no filename or function needed
+        if filename == 'none' and function_name == 'none':
+            function_code = [user_prompt]
+        else:
+            function_code = []
+            for id_ in filtered_ids:
+                item = self.collection.get(id_)
+                function_code.append(item['metadatas'][0]['text'] + '\n')
 
         function_code = '\n'.join(function_code)
         prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
