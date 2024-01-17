@@ -3,7 +3,10 @@
 """
 
 
-def parse_response(text: str, keywords: list[str]) -> dict[str, list[str]]:
+def parse_response(
+        text: str,
+        keywords: list[str]
+    ) -> dict[str, str | list[str]]:
     """
     Parse an LLM response with sections including Reason:, Tool: and numbered
     Parameter_N lines into a dictionary of section lines
@@ -14,8 +17,6 @@ def parse_response(text: str, keywords: list[str]) -> dict[str, list[str]]:
     Returns:
         dict: A dictionary representation of the parsed text.
     """
-
-    keywords = ['Reason', 'Tool']
 
     # Split the text into lines
     lines = text.split('\n')
@@ -35,13 +36,13 @@ def parse_response(text: str, keywords: list[str]) -> dict[str, list[str]]:
             values.append(line)
 
     result_dict = {}
-    for key, val in parsed_dict.items():
+    for keyword, keyword_lines in parsed_dict.items():
 
-        val = '\n'.join(val)
+        keyword_value = '\n'.join(keyword_lines)
 
-        if key.startswith('Parameter_'):
-            val = val.split(' | ')
+        if keyword.startswith('Parameter_'):
+            keyword_value = keyword_value.split(' | ')
 
-        result_dict[key] = val
+        result_dict[keyword] = keyword_value
 
     return result_dict

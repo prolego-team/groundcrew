@@ -13,10 +13,15 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in the following format.
+CHOOSE_TOOL_PROMPT = """Your task is to either (1) respond directly to the user's question or (2) choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in one of the following two formats.
 
+(1) If you are responding directly to the user's questions, use this format:
+Response: Write your response here.
+
+(2) If you are choosing the correct tool and parameters, use this format:
 Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
 Tool: Tool Name
+Tool query: Provide a query to the tool to get the answer to the question.
 Parameter_0: Parameter_0 Name | Variable value | parameter type
 ...
 Parameter_N: Parameter_N Name | Variable value | parameter type

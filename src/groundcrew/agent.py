@@ -25,7 +25,7 @@ class Agent:
 
     Methods:
         run(): Continuously process user inputs and execute corresponding tools.
-        choose_tool(user_prompt): Analyze the user prompt and select the
+        dispatch(user_prompt): Analyze the user prompt and select the
         appropriate tool for response.
     """
     def __init__(
@@ -42,7 +42,14 @@ class Agent:
         self.llm = chat_llm
         self.tools = tools
         self.messages = [
-            {'role': 'system', 'content': 'You are a helpful assistant.'}
+            {
+                'role': 'system',
+                'content': (
+                    'You are an assistant that answers question about codebase. '
+                    'All of the user\'s questions should be about this particular '
+                    'codebase, and you will be given tools that you can use to help '
+                    'you answer questions about the codebase.')
+            }
         ]
 
     def run(self):
@@ -57,13 +64,13 @@ class Agent:
                 user_prompt = 'What is the name of the function that finds pdfs in a directory?'
 
             self.messages.append({'role': 'user', 'content': user_prompt})
-            tool, args = self.choose_tool(user_prompt)
-            response = tool.obj(user_prompt, **args)
+
+            response = self.dispatch(user_prompt)
             self.messages.append({'role': 'assistant', 'content': response})
 
             print(response)
 
-    def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
+    def dispatch(self, user_prompt: str) -> str:
         """
         Analyze the user's input and choose an appropriate tool for generating
         a response.
@@ -72,8 +79,7 @@ class Agent:
             user_prompt (str): The user's input or question.
 
         Returns:
-            tuple: A tuple containing the chosen tool object and its
-            corresponding parameters.
+            str: The response from the tool or LLM.
         """
         base_prompt = sp.CHOOSE_TOOL_PROMPT
         base_prompt += '### Question ###\n'
@@ -83,23 +89,36 @@ class Agent:
         for tool in self.tools.values():
             base_prompt += tool.to_yaml() + '\n\n'
 
-        tool_prompt = base_prompt
+        dispatch_prompt = base_prompt
 
-        tool = None
-        while tool is None:
+        dispatch_messages = self.messages + [
+            {'role': 'user', 'content': dispatch_prompt}
+        ]
+        dispatch_response = self.llm(dispatch_messages)
 
-            # Choose a Tool
-            tool_messages = self.messages + [{'role': 'user', 'content': tool_prompt}]
-            tool_response = self.llm(tool_messages)
-            parsed_tool_response = autils.parse_response(
-                tool_response['content'], keywords=['Reason', 'Tool'])
+        parsed_response = autils.parse_response(
+            dispatch_response['content'],
+            keywords=['Response', 'Reason', 'Tool', 'Tool query']
+        )
 
-            if parsed_tool_response['Tool'] in self.tools:
-                tool = self.tools[parsed_tool_response['Tool']]
+        if 'Tool' in parsed_response:
+            tool_selection = parsed_response['Tool']
+            if tool_selection not in self.tools:
+                return 'The LLM tried to call a function that does not exist.'
 
-            # TODO - handle case where tool is not found
+            tool = self.tools[tool_selection]
+            tool_args = self.extract_params(parsed_response)
+            print(f'Please standby while I run the tool {tool.name}...')
+            print(f'("{parsed_response["Tool query"]}", {tool_args})')
+            response = tool.obj(parsed_response['Tool query'], **tool_args)
 
-            return tool, self.extract_params(parsed_tool_response)
+        elif 'Response' in parsed_response:
+            response = parsed_response['Response']
+
+        else:
+            response = 'I cannot answer that question. Sorry!'
+
+        return response
 
     def extract_params(
             self,
@@ -143,7 +162,7 @@ class Agent:
                     elif param_value.lower() == 'false':
                         param_value = False
                     else:
-                        param_value=None
+                        param_value = None
 
                 args[param_name.replace(' ', '')] = param_value
 
