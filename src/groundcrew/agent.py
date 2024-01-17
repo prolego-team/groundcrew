@@ -5,7 +5,7 @@ import readline
 
 from typing import Any, Callable
 
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp
 from groundcrew.dataclasses import Config, Tool
