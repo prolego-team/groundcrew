@@ -8,6 +8,7 @@ import numpy as np
 import transformers as tfs
 
 from groundcrew import code
+from groundcrew import constants
 from groundcrew import emb as ef
 
 
@@ -46,8 +47,8 @@ def main(models_dir_path: str):
     # ~~~~ collection with default embedding function
 
     collection = client.get_or_create_collection(
-        name=code.DEFAULT_COLLECTION_NAME,
-        embedding_function=code.DEFAULT_EF
+        name=constants.DEFAULT_COLLECTION_NAME,
+        embedding_function=constants.DEFAULT_EF
     )
     collection.upsert(
         documents=docs,
