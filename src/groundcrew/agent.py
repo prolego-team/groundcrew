@@ -54,6 +54,19 @@ class Agent:
 
             while user_prompt == '':
                 user_prompt = input('> ')
+                if '\\code' in user_prompt:
+                    print(Colors.YELLOW)
+                    print('Code mode activated — type \end to submit')
+                    print(Colors.ENDC)
+                    user_prompt += '\n'
+
+                line = input('')
+
+                while '\\end' not in line:
+                    user_prompt += line + '\n'
+                    line = input('')
+
+            user_prompt = user_prompt.replace('\\code', '')
 
             tool, args = self.choose_tool(user_prompt)
 
