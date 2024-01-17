@@ -19,14 +19,14 @@ class Agent:
     Attributes:
         config (dict): Configuration settings for the agent.
         collection (object): The collection or database the agent interacts with.
-        llm (object): A large language model used by the agent for processing
+        chat_llm (object): A chat-based LLM used by the agent for processing
         and interpreting prompts.
         tools (dict): A dictionary of tools available for the agent to use.
 
     Methods:
         run(): Continuously process user inputs and execute corresponding tools.
         dispatch(user_prompt): Analyze the user prompt and select the
-        appropriate tool for response.
+        appropriate tool for response or respond directly if appropriate.
     """
     def __init__(
             self,
@@ -45,7 +45,7 @@ class Agent:
             {
                 'role': 'system',
                 'content': (
-                    'You are an assistant that answers question about codebase. '
+                    'You are an assistant that answers question about a codebase. '
                     'All of the user\'s questions should be about this particular '
                     'codebase, and you will be given tools that you can use to help '
                     'you answer questions about the codebase.')

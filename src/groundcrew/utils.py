@@ -10,7 +10,6 @@ from typing import Any, Callable
 import yaml
 import astunparse
 
-from openai import OpenAI
 from chromadb import Collection
 
 from groundcrew import system_prompts as sp
@@ -18,10 +17,8 @@ from groundcrew.dataclasses import Tool
 from groundcrew.llm import openaiapi
 
 
-def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], str]:
-    """
-
-    """
+def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[dict[str, str]], str]:
+    """Make an LLM client that accepts a list of messages and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()
         chat_session = openaiapi.start_chat(model, client)
@@ -36,9 +33,7 @@ def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], 
 
 
 def build_llm_completion_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], str]:
-    """
-
-    """
+    """Make an LLM client that accepts a string prompt and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()
         completion = openaiapi.start_chat(model, client)
