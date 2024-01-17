@@ -12,7 +12,12 @@ from groundcrew import emb as ef
 
 
 @click.command()
-@click.option('--models_dir_path', '-m', required=True)
+@click.option(
+    '--models_dir_path', '-m',
+    required=True,
+    default='.models_cache',
+    help='Directory to download / load the embedding model from.'
+)
 def main(models_dir_path: str):
     """main program"""
 
