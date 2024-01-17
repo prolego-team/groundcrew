@@ -110,6 +110,7 @@ class Agent:
             tool_args = self.extract_params(parsed_response)
             print(f'Please standby while I run the tool {tool.name}...')
             print(f'("{parsed_response["Tool query"]}", {tool_args})')
+            print()
             response = tool.obj(parsed_response['Tool query'], **tool_args)
 
         elif 'Response' in parsed_response:
