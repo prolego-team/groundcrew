@@ -152,6 +152,9 @@ class SingleDocstringTool:
                 item = self.collection.get(id_)
                 function_code.append(item['metadatas'][0]['text'] + '\n')
 
+        if not function_code:
+            return 'No matching functions found.'
+
         function_code = '\n'.join(function_code)
         prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
 
