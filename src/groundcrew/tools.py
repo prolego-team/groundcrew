@@ -1,11 +1,14 @@
 """
 File for Tools
 """
+import os
+
+from abc import ABC, abstractmethod
 from typing import Callable
 
 from chromadb import Collection
 
-from groundcrew import code
+from groundcrew import code, system_prompts as sp
 from groundcrew.dataclasses import Chunk
 
 
@@ -16,11 +19,13 @@ def query_codebase(
 
     Args:
         prompt (str): The prompt to query the codebase.
+        collection (Collection): The chromadb collection to query
         n_results (int, optional): The number of results to return.
-        Defaults to 5.
+        where (dict, optional): A dictionary of additional metadata query
+        parameters.
 
     Returns:
-        list: A list of code chunks relevant to the prompt.
+        list: A list of Chunk objects
     """
     out = collection.query(
         query_texts=[prompt],
@@ -41,6 +46,119 @@ def query_codebase(
             out['ids'][0], out['metadatas'][0], out['documents'][0]
             )
     ]
+
+
+def get_filename_from_id(id_: str):
+    """
+    Gets the filename from the ID used in the database.
+
+    Args:
+        id_ (str): The ID to parse.
+
+    Returns:
+        str: The filename.
+    """
+    return os.path.basename(id_.split('::')[0])
+
+
+class SingleDocstringTool:
+    """
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """
+        Initialize the SingleDocstringTool with a base prompt, a code
+        collection, and a language model.
+
+        Args:
+            base_prompt (str): The base prompt to prepend to all queries.
+            collection (Collection): The code collection or database to query
+            for code-related information.
+            llm (Callable): The language model to use for generating
+            code-related responses.
+        """
+        self.base_prompt = base_prompt
+        self.collection = collection
+        self.llm = llm
+
+        # Adding additional instructions
+        self.base_prompt = base_prompt + sp.DOCSTRING_PROMPT
+
+    def __call__(
+            self,
+            user_prompt: str,
+            filename: str = 'none',
+            function_name: str = 'none') -> str:
+        """
+        Generate docstrings for a given function, or all functions in a given
+        file.
+
+        Scenarios:
+            - filename is not 'none', function_name is 'none': generate
+              docstrings for all functions in the file
+            - filename is not 'none', function_name is not 'none': search for
+              the correct function in the correct file and generate docstrings
+            - filename is 'none', function_name is not 'none': search for the
+              correct function in the database and generate docstring
+            - filename is 'none', function_name is 'none': assumes the
+              user_prompt includes code and generates the docstring for that
+        Args:
+            prompt (str): The prompt to process.
+            filename (str): A filename to query and generate docstrings for all
+            functions within the file. If empty, pass "none".
+            function_name (str): The name of the function to generate a
+            docstring for. If empty, pass "none".
+
+        Returns:
+            str: The generated response from the language model.
+        """
+
+        all_ids = self.collection.get()['ids']
+
+        # Flag for generating docstrings for all functions in a file
+        all_functions = False
+        if function_name == 'none':
+            all_functions = True
+
+        # IDs of the files/functions to generate docstrings for
+        filtered_ids = []
+        if filename != 'none':
+            for id_ in all_ids:
+
+                # This will match with all functions in the given file
+                if all_functions and '::' in id_ and get_filename_from_id(id_) == filename:
+                    filtered_ids.append(id_)
+
+                # This will match with a single function in the given file
+                elif not all_functions and f'::{function_name}' in id_ and get_filename_from_id(id_) == filename:
+                    filtered_ids.append(id_)
+
+        # No filename was given, find the function(s) given
+        elif filename == 'none' and function_name != 'none':
+            for id_ in all_ids:
+
+                # If '::' isn't in the ID then it's a file
+                if '::' not in id_:
+                    continue
+
+                if function_name in id_:
+                    filtered_ids.append(id_)
+
+        # User included code in their prompt so no filename or function needed
+        if filename == 'none' and function_name == 'none':
+            function_code = [user_prompt]
+        else:
+            function_code = []
+            for id_ in filtered_ids:
+                item = self.collection.get(id_)
+                function_code.append(item['metadatas'][0]['text'] + '\n')
+
+        if not function_code:
+            return 'No matching functions found.'
+
+        function_code = '\n'.join(function_code)
+        prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
+
+        return self.llm(prompt)
 
 
 class CodebaseQATool:
@@ -65,7 +183,7 @@ class CodebaseQATool:
         self.collection = collection
         self.llm = llm
 
-    def __call__(self, prompt: str, include_code: bool) -> str:
+    def __call__(self, user_prompt: str, include_code: bool) -> str:
         """
         Processes a given prompt, queries the codebase, and uses the language
         model to generate a response.
@@ -77,15 +195,15 @@ class CodebaseQATool:
         Returns:
             str: The generated response from the language model.
         """
-        chunks = query_codebase(prompt, self.collection)
+        chunks = query_codebase(user_prompt, self.collection)
 
-        prompt = self.base_prompt + '### Question ###\n'
-        prompt += f'{prompt}\n\n'
-
+        prompt = ''
         for chunk in chunks:
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
-        return self.llm(prompt)
+        prompt += self.base_prompt + '\n### Question ###\n'
+        prompt += f'{user_prompt}\n\n'
 
+        return self.llm(prompt)
 

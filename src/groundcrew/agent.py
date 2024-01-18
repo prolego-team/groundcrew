@@ -1,14 +1,16 @@
 """
 Main agent class interacting with a user
 """
+import inspect
 import readline
 
 from typing import Any, Callable
 
+from yaspin import yaspin
 from chromadb import Collection
 
-from groundcrew import agent_utils as autils, system_prompts as sp
-from groundcrew.dataclasses import Config, Tool
+from groundcrew import agent_utils as autils, system_prompts as sp, utils
+from groundcrew.dataclasses import Colors, Config, Tool
 
 
 class Agent:
@@ -42,6 +44,28 @@ class Agent:
         self.llm = llm
         self.tools = tools
 
+        self.colors = {
+            'system': Colors.YELLOW,
+            'user': Colors.GREEN,
+            'agent': Colors.BLUE
+        }
+
+    def print(self, text: str, role: str) -> None:
+        """
+        Helper function to print text with a given color and role.
+
+        Args:
+            text (str): The text to print.
+            role (str): The role of the text to print.
+
+        Returns:
+            None
+        """
+        print(self.colors[role])
+        print(f'[{role}]')
+        print(Colors.ENDC)
+        print(text)
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
@@ -49,14 +73,49 @@ class Agent:
         """
         while True:
 
-            user_prompt = input('> ')
-            if not user_prompt:
-                user_prompt = 'What is the name of the function that finds pdfs in a directory?'
+            user_prompt = ''
 
+            while user_prompt == '':
+                user_prompt = input('[user] > ')
+                if '\\code' in user_prompt:
+                    print(Colors.YELLOW)
+                    print('Code mode activated — type \end to submit')
+                    print(Colors.ENDC)
+                    user_prompt += '\n'
+
+                    line = input('')
+
+                    while '\\end' not in line:
+                        user_prompt += line + '\n'
+                        line = input('')
+
+            user_prompt = user_prompt.replace('\\code', '')
+
+            spinner = yaspin(text='Choosing tool...', color='green')
+            spinner.start()
             tool, args = self.choose_tool(user_prompt)
-            response = tool.obj(user_prompt, **args)
+            spinner.stop()
 
-            print(response)
+            # TODO - Make sure the tool is not None
+            # TODO - handle params that should be there but are not
+
+            tool_params = inspect.signature(tool.obj).parameters
+
+            # Filter out incorrect parametersd
+            new_args = {}
+            for param_name, val in args.items():
+                if param_name in tool_params:
+                    new_args[param_name] = val
+            args = new_args
+
+            spinner = yaspin(text='Thinking...', color='green')
+            spinner.start()
+            response = utils.highlight_code(
+                tool.obj(user_prompt, **args),
+                self.config.colorscheme)
+            spinner.stop()
+
+            self.print(response, 'agent')
 
 
     def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
@@ -71,13 +130,16 @@ class Agent:
             tuple: A tuple containing the chosen tool object and its
             corresponding parameters.
         """
-        base_prompt = sp.CHOOSE_TOOL_PROMPT
+
+        base_prompt = '### Tools ###\n'
+        for tool in self.tools.values():
+            base_prompt += tool.to_yaml() + '\n\n'
+
         base_prompt += '### Question ###\n'
         base_prompt += user_prompt + '\n\n'
 
-        base_prompt += '### Tools ###\n'
-        for tool in self.tools.values():
-            base_prompt += tool.to_yaml() + '\n\n'
+        # Put instructions at the end of the prompt
+        base_prompt += sp.CHOOSE_TOOL_PROMPT
 
         tool_prompt = base_prompt
 
@@ -86,6 +148,14 @@ class Agent:
 
             # Choose a Tool
             tool_response = self.llm(tool_prompt)
+
+            if self.config.debug:
+                print(Colors.MAGENTA)
+                print(tool_prompt, Colors.ENDC, '\n')
+                print(Colors.GREEN)
+                print(tool_response, Colors.ENDC)
+
+            # Parse Tool response
             parsed_tool_response = autils.parse_response(
                 tool_response, keywords=['Reason', 'Tool'])
 

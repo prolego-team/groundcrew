@@ -15,8 +15,6 @@ def parse_response(text: str, keywords: list[str]) -> dict[str, list[str]]:
         dict: A dictionary representation of the parsed text.
     """
 
-    keywords = ['Reason', 'Tool']
-
     # Split the text into lines
     lines = text.split('\n')
 

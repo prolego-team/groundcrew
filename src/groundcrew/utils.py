@@ -1,4 +1,5 @@
 """
+Utility functions
 """
 import os
 import ast
@@ -13,8 +14,63 @@ import astunparse
 from openai import OpenAI
 from chromadb import Collection
 
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import Terminal256Formatter
+
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
+
+
+def highlight_code_helper(text: str, colorscheme: str) -> str:
+    """
+    Highlights code in a given text string.
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    start_idx = text.find('```python')
+    end_idx = text.find('```', start_idx + 1)
+
+    # No python code found
+    if start_idx == end_idx == -1:
+        return text
+
+    code = ''
+    if '```python' in text:
+        code = text.split('```python')[1].split('```')[0]
+        code = highlight(
+            code,
+            PythonLexer(),
+            Terminal256Formatter(style=colorscheme, background='dark'))
+
+    return text[:start_idx] + code + text[end_idx + 3:]
+
+
+def highlight_code(text: str, colorscheme: str) -> str:
+    """
+    Uses the helper function to highlight code in a given text
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    if '```python' not in text:
+        return text
+
+    out = highlight_code_helper(text, colorscheme)
+
+    while '```python' in out:
+        out = highlight_code_helper(out, colorscheme)
+
+    return out
 
 
 def build_llm_client(model: str='gpt-4-1106-preview'):
@@ -146,7 +202,7 @@ def setup_tools(
                 tool_obj = tool_constructor(**args)
 
                 # Check that the tool object has the correct signature
-                assert 'prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a prompt parameter'
+                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
 
                 assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
 
@@ -172,8 +228,7 @@ def convert_tool_str_to_yaml(function_str: str, llm: Callable) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
-    return llm(prompt)
+    return llm(sp.TOOL_GPT_PROMPT + '\n\n' + function_str)
 
 
 def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
