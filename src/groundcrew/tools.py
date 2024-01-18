@@ -135,8 +135,7 @@ class LintFileTool:
 
         if thresh_match < thresh:
             return None
-        else:
-            return top
+        return top
 
     def get_paths(self) -> dict[str, str]:
         """Get a dict filepaths (keyed by id) from the collection's metadata."""
