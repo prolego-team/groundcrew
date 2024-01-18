@@ -70,26 +70,18 @@ class LintFileTool:
         Linters usually operate per file so this granularity makes sense.
         """
 
-        print('filepath_inexact:', filepath_inexact)
-
         # ensure that filepath is a real path of a file in the collection
-        # TODO: figure out what the correct threshold is here
+        # TODO: figure out what the correct threshold is here...
+        #       probably higher than 50
         filepath = self.fuzzy_match_file_path(filepath_inexact, 50)
 
         if filepath is None:
             return f'Could not find a source file matching `{filepath_inexact}`'
 
-        print('filepath (exact):', filepath)
-
         linter_output = self.run_ruff(filepath)
 
         if not linter_output:
             linter_output = 'Linter did not find any issues.'
-
-        print('---- ---- ----')
-        print('linter output:')
-        print(linter_output)
-        print('---- ---- ----')
 
         prompt = (
             linter_output +
@@ -107,8 +99,6 @@ class LintFileTool:
 
         try:
             command = ['ruff', '--preview',  filepath]
-            print(command)
-            print(self.working_dir_path)
             linter_output = subprocess.check_output(command, cwd=self.working_dir_path)
         except subprocess.CalledProcessError as e:
             linter_output = e.output
@@ -135,7 +125,6 @@ class LintFileTool:
 
         # fuzzy match on filepaths
         top, thresh_match = fuzzprocess.extractOne(search, paths)
-        print(thresh_match)
 
         if thresh_match < thresh:
             return None
