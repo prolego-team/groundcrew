@@ -199,8 +199,6 @@ class CodebaseQATool:
 
         prompt = ''
         for chunk in chunks:
-            #print(chunk.text)
-            #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
