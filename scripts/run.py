@@ -238,7 +238,9 @@ def main(config: str, model: str):
         config.Tools,
         tool_descriptions,
         collection,
-        llm)
+        llm,
+        config.repository
+    )
     utils.save_tools_to_yaml(tools, tools_filepath)
 
     agent = Agent(config, collection, llm, tools)
@@ -247,4 +249,3 @@ def main(config: str, model: str):
 
 if __name__ == '__main__':
     main()
-

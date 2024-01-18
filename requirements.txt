@@ -3,8 +3,12 @@ chromadb==0.4.22
 GitPython==3.1.40
 numpy==1.26.3
 openai==1.6.1
+pygments==2.17.2
 pytest==7.4.4
 pytest-cov==4.1.0
+ruff==0.1.11
+thefuzz==0.20.0
+torch==2.1.2
 torch==2.1.2
 transformers==4.36.2
 yaspin==3.0.1

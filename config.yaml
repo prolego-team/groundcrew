@@ -7,5 +7,6 @@ Tools:
     tools:
       - CodebaseQATool
       - SingleDocstringTool
+      - LintFileTool
 colorscheme: 'gruvbox-dark'
 debug: false

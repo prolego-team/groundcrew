@@ -7,7 +7,6 @@ import chromadb
 import numpy as np
 import transformers as tfs
 
-from groundcrew import code
 from groundcrew import constants
 from groundcrew import emb as ef
 
@@ -28,6 +27,13 @@ def main(models_dir_path: str):
     with open('mtgrules.txt', 'r') as f:
         rules = f.readlines()
     rules = ''.join(rules)
+
+    client = chromadb.PersistentClient('baloney')
+
+    collection = client.get_or_create_collection(
+        name=constants.DEFAULT_COLLECTION_NAME,
+        embedding_function=constants.DEFAULT_EF
+    )
 
     # https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
     # "By default, input text longer than 256 word pieces is truncated."
@@ -79,7 +85,7 @@ def main(models_dir_path: str):
     emb_func = E5EmbeddingFunction(tokenizer, model)
 
     collection = client.get_or_create_collection(
-        name=code.DEFAULT_COLLECTION_NAME,
+        name=constants.DEFAULT_COLLECTION_NAME,
         embedding_function=emb_func
     )
     collection.upsert(

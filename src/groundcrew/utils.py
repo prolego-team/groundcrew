@@ -128,7 +128,8 @@ def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
         collection: Collection,
-        llm: Callable) -> dict[str, Tool]:
+        llm: Callable,
+        working_dir_path: str) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -147,7 +148,8 @@ def setup_tools(
     # Parameters available to a tool constructor
     params = {
         'collection': collection,
-        'llm': llm
+        'llm': llm,
+        'working_dir_path': working_dir_path
     }
 
     tools = {}
@@ -261,4 +263,3 @@ def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
     with open(filename, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f'Saved {filename}\n')
-

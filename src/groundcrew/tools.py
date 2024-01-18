@@ -3,9 +3,10 @@ File for Tools
 """
 import os
 
-from abc import ABC, abstractmethod
+import subprocess
 from typing import Callable
 
+from thefuzz import process as fuzzprocess
 from chromadb import Collection
 
 from groundcrew import code, system_prompts as sp
@@ -46,6 +47,108 @@ def query_codebase(
             out['ids'][0], out['metadatas'][0], out['documents'][0]
             )
     ]
+
+
+class LintFileTool:
+    """
+    Interact with a linter using natural language.
+    """
+
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable,
+            working_dir_path: str):
+        """Constructor."""
+        self.collection = collection
+        self.llm = llm
+        self.base_prompt = base_prompt + sp.LINTER_PROMPT
+        self.working_dir_path = working_dir_path
+
+    def __call__(
+            self,
+            user_prompt: str,
+            filepath_inexact: str) -> str:
+        """
+        Answer questions using about linting results for a file.
+        filepath_inexact is a file path which can be inexact, it will be fuzzy
+        matched to find an exact file path for the project.
+        Linters usually operate per file so this granularity makes sense.
+        """
+
+        # ensure that filepath is a real path of a file in the collection
+        # TODO: figure out what the correct threshold is here...
+        #       probably higher than 50
+        filepath = self.fuzzy_match_file_path(filepath_inexact, 50)
+
+        if filepath is None:
+            return f'Could not find a source file matching `{filepath_inexact}`'
+
+        linter_output = self.run_ruff(filepath)
+
+        if not linter_output:
+            linter_output = 'Linter did not find any issues.'
+
+        prompt = (
+            linter_output +
+            '\n### Task ###\n' + self.base_prompt +
+            '\n### Question ###\n' + user_prompt + '\n'
+        )
+
+        return self.llm(prompt)
+
+    def run_ruff(self, filepath: str) -> str:
+        """
+        Run ruff on a file and capture the output.
+        Filter some of the output like comments about things being fixable with `--fix`.
+        """
+
+        try:
+            command = ['ruff', 'check', '--preview',  filepath]
+            linter_output = subprocess.check_output(command, cwd=self.working_dir_path)
+        except subprocess.CalledProcessError as e:
+            linter_output = e.output
+
+        linter_output = linter_output.decode()
+
+        linter_output = [
+            x for x in linter_output.split('\n')
+            if not x.startswith('[*]')
+        ]
+
+        return '\n'.join(linter_output)
+
+    def fuzzy_match_file_path(self, search: str, thresh: int) -> str | None:
+        """Find a real file path in a collection given an example."""
+
+        # there's a limited number of metadata filter options in chroma
+        # so we'll grab everything and manufally filter
+
+        paths = list(set(self.get_paths().values()))
+
+        # it might be possible to do something where we fuzzy match on ids instead
+        # and then we could filter result lines by chunk
+
+        # fuzzy match on filepaths
+        top, thresh_match = fuzzprocess.extractOne(search, paths)
+
+        if thresh_match < thresh:
+            return None
+        return top
+
+    def get_paths(self) -> dict[str, str]:
+        """Get a dict filepaths (keyed by id) from the collection's metadata."""
+
+        # get all paths and ids
+        all_entries = self.collection.get(
+            include=['metadatas']
+        )
+
+        return {
+            x: y['filepath']
+            for x, y in zip(all_entries['ids'], all_entries['metadatas'])
+        }
 
 
 def get_filename_from_id(id_: str):
@@ -199,6 +302,8 @@ class CodebaseQATool:
 
         prompt = ''
         for chunk in chunks:
+            #print(chunk.text)
+            #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
@@ -206,4 +311,3 @@ class CodebaseQATool:
         prompt += f'{user_prompt}\n\n'
 
         return self.llm(prompt)
-
