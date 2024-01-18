@@ -20,11 +20,13 @@ def query_codebase(
 
     Args:
         prompt (str): The prompt to query the codebase.
+        collection (Collection): The chromadb collection to query
         n_results (int, optional): The number of results to return.
-        Defaults to 5.
+        where (dict, optional): A dictionary of additional metadata query
+        parameters.
 
     Returns:
-        list: A list of code chunks relevant to the prompt.
+        list: A list of Chunk objects
     """
     out = collection.query(
         query_texts=[prompt],
@@ -103,7 +105,7 @@ class LintFileTool:
         """
 
         try:
-            command = ['ruff', '--preview',  filepath]
+            command = ['ruff', 'check', '--preview',  filepath]
             linter_output = subprocess.check_output(command, cwd=self.working_dir_path)
         except subprocess.CalledProcessError as e:
             linter_output = e.output
@@ -136,7 +138,7 @@ class LintFileTool:
         else:
             return top
 
-    def get_paths(self):
+    def get_paths(self) -> dict[str, str]:
         """Get a dict filepaths (keyed by id) from the collection's metadata."""
 
         # get all paths and ids
@@ -254,6 +256,9 @@ class SingleDocstringTool:
                 item = self.collection.get(id_)
                 function_code.append(item['metadatas'][0]['text'] + '\n')
 
+        if not function_code:
+            return 'No matching functions found.'
+
         function_code = '\n'.join(function_code)
         prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
 
@@ -305,7 +310,5 @@ class CodebaseQATool:
 
         prompt += self.base_prompt + '\n### Question ###\n'
         prompt += f'{user_prompt}\n\n'
-
-        print(prompt)
 
         return self.llm(prompt)

@@ -1,4 +1,5 @@
 """
+Utility functions
 """
 import os
 import ast
@@ -21,10 +22,23 @@ from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
 
 
-def highlight_code(text: str, colorscheme: str) -> str:
+def highlight_code_helper(text: str, colorscheme: str) -> str:
+    """
+    Highlights code in a given text string.
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
 
     start_idx = text.find('```python')
     end_idx = text.find('```', start_idx + 1)
+
+    # No python code found
+    if start_idx == end_idx == -1:
+        return text
 
     code = ''
     if '```python' in text:
@@ -35,6 +49,28 @@ def highlight_code(text: str, colorscheme: str) -> str:
             Terminal256Formatter(style=colorscheme, background='dark'))
 
     return text[:start_idx] + code + text[end_idx + 3:]
+
+
+def highlight_code(text: str, colorscheme: str) -> str:
+    """
+    Uses the helper function to highlight code in a given text
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    if '```python' not in text:
+        return text
+
+    out = highlight_code_helper(text, colorscheme)
+
+    while '```python' in out:
+        out = highlight_code_helper(out, colorscheme)
+
+    return out
 
 
 def build_llm_client(model: str='gpt-4-1106-preview'):
@@ -227,4 +263,3 @@ def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
     with open(filename, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f'Saved {filename}\n')
-

@@ -6,6 +6,7 @@ import readline
 
 from typing import Any, Callable
 
+from yaspin import yaspin
 from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
@@ -43,6 +44,28 @@ class Agent:
         self.llm = llm
         self.tools = tools
 
+        self.colors = {
+            'system': Colors.YELLOW,
+            'user': Colors.GREEN,
+            'agent': Colors.BLUE
+        }
+
+    def print(self, text: str, role: str) -> None:
+        """
+        Helper function to print text with a given color and role.
+
+        Args:
+            text (str): The text to print.
+            role (str): The role of the text to print.
+
+        Returns:
+            None
+        """
+        print(self.colors[role])
+        print(f'[{role}]')
+        print(Colors.ENDC)
+        print(text)
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
@@ -53,7 +76,7 @@ class Agent:
             user_prompt = ''
 
             while user_prompt == '':
-                user_prompt = input('> ')
+                user_prompt = input('[user] > ')
                 if '\\code' in user_prompt:
                     print(Colors.YELLOW)
                     print('Code mode activated — type \end to submit')
@@ -68,7 +91,10 @@ class Agent:
 
             user_prompt = user_prompt.replace('\\code', '')
 
+            spinner = yaspin(text='Choosing tool...', color='green')
+            spinner.start()
             tool, args = self.choose_tool(user_prompt)
+            spinner.stop()
 
             # TODO - Make sure the tool is not None
             # TODO - handle params that should be there but are not
@@ -82,14 +108,14 @@ class Agent:
                     new_args[param_name] = val
             args = new_args
 
-            # this is causing repeated output - needs to be fixed
-            # response = utils.highlight_code(
-            #     tool.obj(user_prompt, **args),
-            #     self.config.colorscheme)
+            spinner = yaspin(text='Thinking...', color='green')
+            spinner.start()
+            response = utils.highlight_code(
+                tool.obj(user_prompt, **args),
+                self.config.colorscheme)
+            spinner.stop()
 
-            response = tool.obj(user_prompt, **args)
-
-            print(response)
+            self.print(response, 'agent')
 
 
     def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
