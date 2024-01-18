@@ -59,6 +59,89 @@ def get_filename_from_id(id_: str):
     return os.path.basename(id_.split('::')[0])
 
 
+class CodeGenTool:
+    """
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        """
+        Initialize the SingleDocstringTool with a base prompt, a code
+        collection, and a language model.
+
+        Args:
+            base_prompt (str): The base prompt to prepend to all queries.
+            collection (Collection): The code collection or database to query
+            for code-related information.
+            llm (Callable): The language model to use for generating
+            code-related responses.
+        """
+        self.base_prompt = base_prompt
+        self.collection = collection
+        self.llm = llm
+
+    def __call__(
+            self,
+            user_prompt: str,
+            filename: str = 'none',
+            function_name: str = 'none') -> str:
+        """
+
+        Args:
+            prompt (str): The prompt to process.
+            filename (str): A filename to query and generate docstrings for all
+            functions within the file. If empty, pass "none".
+            function_name (str): The name of the function to generate a
+            docstring for. If empty, pass "none".
+
+        Returns:
+            str: The generated response from the language model.
+        """
+
+        all_ids = self.collection.get()['ids']
+
+        # Flag for generating docstrings for all functions in a file
+        all_functions = False
+        if function_name == 'none':
+            all_functions = True
+
+        # IDs of the files/functions to generate docstrings for
+        filtered_ids = []
+        if filename != 'none':
+            for id_ in all_ids:
+
+                # This will match with all functions in the given file
+                if all_functions and '::' in id_ and get_filename_from_id(id_) == filename:
+                    filtered_ids.append(id_)
+
+                # This will match with a single function in the given file
+                elif not all_functions and f'::{function_name}' in id_ and get_filename_from_id(id_) == filename:
+                    filtered_ids.append(id_)
+
+        # No filename was given, find the function(s) given
+        elif filename == 'none' and function_name != 'none':
+            for id_ in all_ids:
+
+                # If '::' isn't in the ID then it's a file
+                if '::' not in id_:
+                    continue
+
+                if function_name in id_:
+                    filtered_ids.append(id_)
+
+        # User included code in their prompt so no filename or function needed
+        if filename == 'none' and function_name == 'none':
+            function_code = [user_prompt]
+        else:
+            function_code = []
+            for id_ in filtered_ids:
+                item = self.collection.get(id_)
+                function_code.append(item['metadatas'][0]['text'] + '\n')
+
+        function_code = '\n'.join(function_code)
+        prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
+
+        return self.llm(prompt)
+
+
 class SingleDocstringTool:
     """
     """

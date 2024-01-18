@@ -60,14 +60,15 @@ class Agent:
                     print(Colors.ENDC)
                     user_prompt += '\n'
 
-                line = input('')
-
-                while '\\end' not in line:
-                    user_prompt += line + '\n'
                     line = input('')
+
+                    while '\\end' not in line:
+                        user_prompt += line + '\n'
+                        line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
 
+            print('Choosing tool...')
             tool, args = self.choose_tool(user_prompt)
 
             # TODO - Make sure the tool is not None
