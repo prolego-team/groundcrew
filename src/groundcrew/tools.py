@@ -52,12 +52,17 @@ class LintFileTool:
     Interact with a linter using natural language.
     """
 
-    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable,
+            working_dir_path: str):
         """Constructor."""
         self.collection = collection
         self.llm = llm
         self.base_prompt = base_prompt + sp.LINTER_PROMPT
-        self.working_dir_path: str | None = None
+        self.working_dir_path = working_dir_path
 
     def __call__(
             self,

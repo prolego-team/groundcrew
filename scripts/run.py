@@ -238,11 +238,10 @@ def main(config: str, model: str):
         config.Tools,
         tool_descriptions,
         collection,
-        llm)
+        llm,
+        config.repository
+    )
     utils.save_tools_to_yaml(tools, tools_filepath)
-
-    # hack hack hack
-    tools['LintFileTool'].obj.working_dir_path = config.repository
 
     agent = Agent(config, collection, llm, tools)
     agent.run()
