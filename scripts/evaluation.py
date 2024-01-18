@@ -19,13 +19,13 @@ import yaml
 from groundcrew.dataclasses import Config
 from groundcrew import tools
 from groundcrew import code
-
-from scripts import run
+from groundcrew import constants
+from groundcrew import utils
 
 
 @click.command()
 @click.option('--config', '-c', default='config.yaml')
-@click.option('--model', '-m', default='gpt-3.5-turbo')
+@click.option('--model', '-m', default='gpt-4-1106-preview')
 @click.option('--evals', '-e', default='data/evaluation.yaml')
 @click.option('--n_runs', '-n', default=3)
 @click.option('--output_dir_prefix', '-o', default='eval')
@@ -62,17 +62,24 @@ def main(
     client = chromadb.PersistentClient(config.db_path)
 
     collection = client.get_or_create_collection(
-        name=code.DEFAULT_COLLECTION_NAME,
+        name=constants.DEFAULT_COLLECTION_NAME,
         embedding_function=code.DEFAULT_EF
     )
 
     # OpenAI models can't be created with a seed
     # so this is a simple wrapper that ignores the seed
-    llm_from_seed = lambda _: run.build_llm_client(model)
+    llm_from_seed = lambda _: utils.build_llm_client(model)
 
-    tools_dict = dict(
-        codebase_qa=tools.codebase_qa
+    tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
+    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
+    tools_dict = utils.setup_tools(
+        config.Tools,
+        tool_descriptions,
+        collection,
+        llm,
+        config.repository
     )
+
 
     eval_funcs_dict = dict(
         match_word_any=match_word_any
