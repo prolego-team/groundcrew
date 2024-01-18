@@ -19,11 +19,13 @@ def query_codebase(
 
     Args:
         prompt (str): The prompt to query the codebase.
+        collection (Collection): The chromadb collection to query
         n_results (int, optional): The number of results to return.
-        Defaults to 5.
+        where (dict, optional): A dictionary of additional metadata query
+        parameters.
 
     Returns:
-        list: A list of code chunks relevant to the prompt.
+        list: A list of Chunk objects
     """
     out = collection.query(
         query_texts=[prompt],
@@ -201,8 +203,6 @@ class CodebaseQATool:
 
         prompt += self.base_prompt + '\n### Question ###\n'
         prompt += f'{user_prompt}\n\n'
-
-        print(prompt)
 
         return self.llm(prompt)
 
