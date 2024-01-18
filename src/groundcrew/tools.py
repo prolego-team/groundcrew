@@ -103,7 +103,7 @@ class LintFileTool:
         """
 
         try:
-            command = ['ruff', '--preview',  filepath]
+            command = ['ruff', 'check', '--preview',  filepath]
             linter_output = subprocess.check_output(command, cwd=self.working_dir_path)
         except subprocess.CalledProcessError as e:
             linter_output = e.output
@@ -136,7 +136,7 @@ class LintFileTool:
         else:
             return top
 
-    def get_paths(self):
+    def get_paths(self) -> dict[str, str]:
         """Get a dict filepaths (keyed by id) from the collection's metadata."""
 
         # get all paths and ids
