@@ -9,7 +9,7 @@ Figure out how chromadb embedding stuff works.
 import chromadb
 import numpy as np
 
-from groundcrew import code
+from groundcrew import constants
 
 
 def main():
@@ -23,8 +23,8 @@ def main():
     client = chromadb.PersistentClient('baloney')
 
     collection = client.get_or_create_collection(
-        name=code.DEFAULT_COLLECTION_NAME,
-        embedding_function=code.DEFAULT_EF
+        name=constants.DEFAULT_COLLECTION_NAME,
+        embedding_function=constants.DEFAULT_EF
     )
 
     # https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2

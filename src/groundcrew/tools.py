@@ -47,20 +47,21 @@ def query_codebase(
     ]
 
 
-class LintFileTool(ToolBase):
+class LintFileTool:
     """
     Interact with a linter using natural language.
     """
 
     def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
         """Constructor."""
-        super().__init__(base_prompt, collection, llm)
+        self.collection = collection
+        self.llm = llm
         self.base_prompt = base_prompt + sp.LINTER_PROMPT
         self.working_dir_path: str | None = None
 
     def __call__(
             self,
-            prompt: str,
+            user_prompt: str,
             filepath_inexact: str) -> str:
         """
         Answer questions using about linting results for a file.
@@ -76,7 +77,7 @@ class LintFileTool(ToolBase):
         filepath = self.fuzzy_match_file_path(filepath_inexact, 50)
 
         if filepath is None:
-            return f'Could not find a source file matching `{filepath}`'
+            return f'Could not find a source file matching `{filepath_inexact}`'
 
         print('filepath (exact):', filepath)
 
@@ -93,7 +94,7 @@ class LintFileTool(ToolBase):
         prompt = (
             linter_output +
             '\n### Task ###\n' + self.base_prompt +
-            '\n### Question ###\n' + prompt + '\n'
+            '\n### Question ###\n' + user_prompt + '\n'
         )
 
         return self.llm(prompt)
@@ -122,31 +123,37 @@ class LintFileTool(ToolBase):
         return '\n'.join(linter_output)
 
     def fuzzy_match_file_path(self, search: str, thresh: int) -> str | None:
-        """find a real file path in a collection given an example"""
+        """Find a real file path in a collection given an example."""
 
         # there's a limited number of metadata filter options in chroma
         # so we'll grab everything and manufally filter
+
+        paths = list(set(self.get_paths().values()))
+
+        # it might be possible to do something where we fuzzy match on ids instead
+        # and then we could filter result lines by chunk
+
+        # fuzzy match on filepaths
+        top, thresh_match = fuzzprocess.extractOne(search, paths)
+        print(thresh_match)
+
+        if thresh_match < thresh:
+            return None
+        else:
+            return top
+
+    def get_paths(self):
+        """Get a dict filepaths (keyed by id) from the collection's metadata."""
 
         # get all paths and ids
         all_entries = self.collection.get(
             include=['metadatas']
         )
 
-        paths_ids = [
-            (x['filepath'], y)
-            for x, y in zip(all_entries['metadatas'], all_entries['ids'])
-        ]
-
-        # fuzzy match on filepaths
-        top, thresh_match = fuzzprocess.extractOne(search, [x[0] for x in paths_ids])
-
-        # it might be possible to do something where we fuzzy match on ids instead
-        # and then we could filter result lines by chunk
-
-        if thresh_match < thresh:
-            return None
-        else:
-            return top
+        return {
+            x: y['filepath']
+            for x, y in zip(all_entries['ids'], all_entries['metadatas'])
+        }
 
 
 def get_filename_from_id(id_: str):

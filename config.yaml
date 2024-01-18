@@ -9,4 +9,4 @@ Tools:
       - SingleDocstringTool
       - LintFileTool
 colorscheme: 'gruvbox-dark'
-debug: false
+debug: true

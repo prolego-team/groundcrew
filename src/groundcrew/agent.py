@@ -60,11 +60,11 @@ class Agent:
                     print(Colors.ENDC)
                     user_prompt += '\n'
 
-                line = input('')
-
-                while '\\end' not in line:
-                    user_prompt += line + '\n'
                     line = input('')
+
+                    while '\\end' not in line:
+                        user_prompt += line + '\n'
+                        line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
 
@@ -82,9 +82,12 @@ class Agent:
                     new_args[param_name] = val
             args = new_args
 
-            response = utils.highlight_code(
-                tool.obj(user_prompt, **args),
-                self.config.colorscheme)
+            # this is causing repeated output - needs to be fixed
+            # response = utils.highlight_code(
+            #     tool.obj(user_prompt, **args),
+            #     self.config.colorscheme)
+
+            response = tool.obj(user_prompt, **args)
 
             print(response)
 
