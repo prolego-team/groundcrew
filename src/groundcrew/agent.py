@@ -102,7 +102,7 @@ class Agent:
             user_prompt = user_prompt.replace('\\code', '')
             self.messages.append({'role': 'user', 'content': user_prompt})
 
-            spinner = yaspin(text='Choosing tool...', color='green')
+            spinner = yaspin(text='Thinking...', color='green')
             spinner.start()
             response = self.dispatch(user_prompt)
             self.messages.append({'role': 'assistant', 'content': response})
@@ -171,19 +171,16 @@ class Agent:
                 print(f'Please standby while I run the tool {tool.name}...')
                 print(f'("{parsed_response["Tool query"]}", {tool_args})')
                 print()
-            spinner = yaspin(text='Thinking...', color='green')
-            spinner.start()
             response = utils.highlight_code(
                 tool.obj(parsed_response['Tool query'], **tool_args),
                 self.config.colorscheme
             )
-            spinner.stop()
-
-        elif 'Response' in parsed_response:
-            response = parsed_response['Response']
 
         else:
-            response = 'I cannot answer that question. Sorry!'
+            return utils.highlight_code(
+                dispatch_response['content'],
+                self.config.colorscheme
+            )
 
         return response
 
