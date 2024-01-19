@@ -81,14 +81,17 @@ def build_llm_client(model: str='gpt-4-1106-preview'):
         client = OpenAI()
 
         def chat_complete(prompt):
-            complete = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return complete.choices[0].message.content
+            try:
+                complete = client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": prompt}
+                    ]
+                )
+                return complete.choices[0].message.content
+            except:
+                return ''
 
     return chat_complete
 
