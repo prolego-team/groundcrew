@@ -3,7 +3,7 @@
     - name: find func A
       tool: CodebaseQATool
       params:
-        base_prompt: Is there functionality to extract text from a pdf?
+        user_prompt: Is there functionality to extract text from a pdf?
         include_code: false
       eval_func:
         typ: match_word_any
@@ -12,7 +12,7 @@
     - name: find func B
       tool: CodebaseQATool
       params:
-        base_prompt: How do I first find the paths for PDFs?
+        user_prompt: How do I first find the paths for PDFs?
         include_code: true
       eval_func:
         typ: match_word_any

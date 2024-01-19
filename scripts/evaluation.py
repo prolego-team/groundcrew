@@ -1,5 +1,7 @@
 """
 Evaluation framework.
+
+Current focus is on testing individual tools.
 """
 
 # Copyright (c) 2023 Prolego Inc. All rights reserved.
@@ -9,7 +11,6 @@ from typing import Dict, List, Callable
 import datetime
 import os
 import re
-import sys
 import time
 
 import chromadb
@@ -68,21 +69,24 @@ def main(
     )
 
     # OpenAI models can't be created with a seed
-
     # so this is a simple wrapper that ignores the seed
     llm_from_seed = lambda _: utils.build_llm_client(model)
     llm = utils.build_llm_client(model)
 
-    # When we load the tools, we want to ensure that we are generating new descriptions.
-    # So we'll use this breaking LLM.
-
-    def breaking_llm(x):
-        """Mock LLM that exits when called."""
-        print('missing tool description!')
-        sys.exit()
-
     tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
     tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
+
+    # This is actually a dictionary of tool constructors, adapted
+    # to take a Collection and LLM.
+
+    # The tuple of Collection and LLM (more or less) defines the
+    # "system" that we are trying to test, since the most obvious
+    # way we could get different behavior from the system is with
+    # different summaries / embeddings / embedding method (Collection)
+    # and different LLM for generative capabilites.
+
+    # Tool base_prompts are passed in here for now but we could make
+    # those part of the system later.
 
     tools_dict = {
         'CodebaseQATool': lambda c, l: tools.CodebaseQATool(
@@ -112,6 +116,9 @@ def main(
 
     # ~~~~ run evaluations
 
+    # For now, we are only testing on one "system"
+    # (one combination of Collection / LLM)
+
     results = {}
 
     for suite in evals:
@@ -119,10 +126,10 @@ def main(
             suite=suite,
             n_runs=n_runs,
             eval_funcs_dict=eval_funcs_dict,
+            tools_dict=tools_dict,
 
             collection=collection,
             llm_from_seed=llm_from_seed,
-            tools_dict=tools_dict
         )
         results = {**results, **results_suite}
 
@@ -156,18 +163,17 @@ def main(
 
     # TODO: when we add the capability to run on different "systems"
     #       we can add functionality to aggregate across system
-    #       and system + question
+    #       and system + test
 
 
 def run_suite(
         suite: Dict,
         n_runs: int,
         eval_funcs_dict: Dict,
+        tools_dict: Dict,
 
         collection: chromadb.Collection,
         llm_from_seed: Callable,
-        tools_dict: Dict
-
         ) -> Dict:
     """run a test suite and return results"""
 
