@@ -68,8 +68,6 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
         # The document is the LLM generated summary
         documents.append(info['summary'])
 
-        break
-
     collection.upsert(
         documents=documents,
         metadatas=metadatas,
