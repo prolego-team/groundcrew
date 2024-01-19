@@ -1,6 +1,12 @@
 """
 """
 
+DEFAULT_MODEL = 'gpt-4-1106-preview'
+
+AGENT_PROMPT = """
+You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase.
+"""
+
 LINTER_PROMPT = """
 Use the linter output above to answer the following question in a few sentences.
 Do not engage in conversation.
@@ -21,15 +27,25 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to choose the correct tool and parameters to answer the question. Each tool has a list of parameters along with which are required or not. If a parameter is required, you MUST generate a value for it. Do not engage in any conversation - your answer must be in the following format.
+CHOOSE_TOOL_PROMPT = """Your task is to either (1) respond directly to the user's question or (2) choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in one of the following two formats.
 
+(1) If you are responding directly to the user's questions, use this format:
+Response: Write your response here. Your response should be limited to 3 sentences or less. If you include code in your response, it should be in a code block like this:
+```python
+# Code goes here
+```
+
+(2) If you are choosing the correct tool and parameters, use this format:
 Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
 Tool: Tool Name
-Parameter_0: Parameter_0 Name | Variable_0 value | parameter type
-Parameter_1: Parameter_1 Name | Variable_1 value | parameter type
+Tool query: Provide a query to the tool to get the answer to the question.
+Parameter_0: Parameter_0 Name | Variable value | parameter type
 ...
-Parameter_N: Parameter_N Name | Variable_N value | parameter type
+Parameter_N: Parameter_N Name | Variable value | parameter type
+
 """
+
+CODEQA_PROMPT = "Your answer should only include information that pertains to the question."
 
 TOOL_GPT_PROMPT = """Your task is to take as input a Python `Tool` class and create a description of the `__call__` method in YAML format like the example below. All `Tools` will include a `user_prompt` parameter in the `__call__` method.
 

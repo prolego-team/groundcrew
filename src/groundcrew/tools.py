@@ -282,7 +282,7 @@ class CodebaseQATool:
             llm (Callable): The language model to use for generating
             code-related responses.
         """
-        self.base_prompt = base_prompt
+        self.base_prompt = base_prompt + sp.CODEQA_PROMPT
         self.collection = collection
         self.llm = llm
 

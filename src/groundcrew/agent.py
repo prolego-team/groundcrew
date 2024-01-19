@@ -11,6 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage
 
 
 class Agent:
@@ -21,28 +22,29 @@ class Agent:
     Attributes:
         config (dict): Configuration settings for the agent.
         collection (object): The collection or database the agent interacts with.
-        llm (object): A large language model used by the agent for processing
+        chat_llm (object): A chat-based LLM used by the agent for processing
         and interpreting prompts.
         tools (dict): A dictionary of tools available for the agent to use.
 
     Methods:
         run(): Continuously process user inputs and execute corresponding tools.
-        choose_tool(user_prompt): Analyze the user prompt and select the
-        appropriate tool for response.
+        dispatch(user_prompt): Analyze the user prompt and select the
+        appropriate tool for response or respond directly if appropriate.
     """
     def __init__(
             self,
             config: Config,
             collection: Collection,
-            llm: Callable,
+            chat_llm: Callable,
             tools: dict[str, Tool]):
         """
         Constructor
         """
         self.config = config
         self.collection = collection
-        self.llm = llm
+        self.llm = chat_llm
         self.tools = tools
+        self.messages = [SystemMessage(sp.AGENT_PROMPT)]
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -90,81 +92,88 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-
-            spinner = yaspin(text='Choosing tool...', color='green')
-            spinner.start()
-            tool, args = self.choose_tool(user_prompt)
-            spinner.stop()
-
-            # TODO - Make sure the tool is not None
-            # TODO - handle params that should be there but are not
-
-            tool_params = inspect.signature(tool.obj).parameters
-
-            # Filter out incorrect parametersd
-            new_args = {}
-            for param_name, val in args.items():
-                if param_name in tool_params:
-                    new_args[param_name] = val
-            args = new_args
+            self.messages.append(UserMessage(user_prompt))
 
             spinner = yaspin(text='Thinking...', color='green')
             spinner.start()
-            response = utils.highlight_code(
-                tool.obj(user_prompt, **args),
-                self.config.colorscheme)
+            response = self.dispatch(user_prompt)
+            self.messages.append(AssistantMessage(response))
             spinner.stop()
+
+            # TODO - handle params that should be there but are not
 
             self.print(response, 'agent')
 
-
-    def choose_tool(self, user_prompt: str) -> tuple[Tool, dict[str, Any]]:
+    def dispatch(self, user_prompt: str) -> str:
         """
-        Analyze the user's input and choose an appropriate tool for generating
-        a response.
+        Analyze the user's input and and either respond or choose an appropriate
+        tool for generating a response. When a tool is called, the output from
+        the tool will be returned as the response.
 
         Args:
             user_prompt (str): The user's input or question.
 
         Returns:
-            tuple: A tuple containing the chosen tool object and its
-            corresponding parameters.
+            str: The response from the tool or LLM.
         """
 
-        base_prompt = '### Tools ###\n'
+        dispatch_prompt = '### Tools ###\n'
         for tool in self.tools.values():
-            base_prompt += tool.to_yaml() + '\n\n'
+            dispatch_prompt += tool.to_yaml() + '\n\n'
 
-        base_prompt += '### Question ###\n'
-        base_prompt += user_prompt + '\n\n'
+        dispatch_prompt += '### Question ###\n'
+        dispatch_prompt += user_prompt + '\n\n'
 
         # Put instructions at the end of the prompt
-        base_prompt += sp.CHOOSE_TOOL_PROMPT
+        dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
 
-        tool_prompt = base_prompt
+        dispatch_messages = self.messages + [UserMessage(dispatch_prompt)]
+        dispatch_response = self.llm(dispatch_messages)
 
-        tool = None
-        while tool is None:
+        if self.config.debug:
+            print(Colors.MAGENTA)
+            print(dispatch_prompt, Colors.ENDC, '\n')
+            print(Colors.GREEN)
+            print(dispatch_response, Colors.ENDC)
 
-            # Choose a Tool
-            tool_response = self.llm(tool_prompt)
+        parsed_response = autils.parse_response(
+            dispatch_response,
+            keywords=['Response', 'Reason', 'Tool', 'Tool query']
+        )
+
+        if 'Tool' in parsed_response:
+            tool_selection = parsed_response['Tool']
+            if tool_selection not in self.tools:
+                return 'The LLM tried to call a function that does not exist.'
+
+            tool = self.tools[tool_selection]
+            tool_args = self.extract_params(parsed_response)
+
+            expected_tool_args = inspect.signature(tool.obj).parameters
+
+            # Filter out incorrect parameters
+            new_args = {}
+            for param_name, val in tool_args.items():
+                if param_name in expected_tool_args:
+                    new_args[param_name] = val
+            tool_args = new_args
 
             if self.config.debug:
-                print(Colors.MAGENTA)
-                print(tool_prompt, Colors.ENDC, '\n')
-                print(Colors.GREEN)
-                print(tool_response, Colors.ENDC)
+                print(f'Please standby while I run the tool {tool.name}...')
+                print(f'("{parsed_response["Tool query"]}", {tool_args})')
+                print()
+            response = utils.highlight_code(
+                tool.obj(parsed_response['Tool query'], **tool_args),
+                self.config.colorscheme
+            )
 
-            # Parse Tool response
-            parsed_tool_response = autils.parse_response(
-                tool_response, keywords=['Reason', 'Tool'])
+        else:
+            response = utils.highlight_code(
+                dispatch_response,
+                self.config.colorscheme
+            )
 
-            if parsed_tool_response['Tool'] in self.tools:
-                tool = self.tools[parsed_tool_response['Tool']]
-
-            # TODO - handle case where tool is not found
-
-            return tool, self.extract_params(parsed_tool_response)
+        return response
 
     def extract_params(
             self,
@@ -208,7 +217,7 @@ class Agent:
                     elif param_value.lower() == 'false':
                         param_value = False
                     else:
-                        param_value=None
+                        param_value = None
 
                 args[param_name.replace(' ', '')] = param_value
 

@@ -82,7 +82,7 @@ response = chat(messages, tools=tools)
 print(response)
 """
 
-from typing import Any, Callable, Iterable
+from typing import Callable, Iterable
 from dataclasses import dataclass
 import json
 
@@ -112,7 +112,7 @@ class UserMessage:
 @dataclass(frozen=True)
 class AssistantMessage:
     content: str
-    tool_calls: list[ToolCall] | None
+    tool_calls: list[ToolCall] | None = None
     role: str = 'assistant'
 
 
@@ -126,7 +126,7 @@ class ToolMessage:
 Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage
 
 
-def get_openaiai_client(api_key: str) -> openai.Client:
+def get_openaiai_client(api_key: str | None = None) -> openai.Client:
     """Get an OpenAI API client."""
     return openai.OpenAI(api_key=api_key)
 
@@ -154,12 +154,41 @@ def message_to_dict(message: Message) -> dict:
             continue
 
         # Handle lists of tools calls in messages
-        if key=='tool_calls' and value is not None:
+        if key == 'tool_calls' and value is not None:
             output_dict[key] = [toolcall_to_dict(tool_call) for tool_call in value]
         else:
             output_dict[key] = value
 
     return output_dict
+
+
+def dict_to_message(message_dict: dict) -> Message:
+    """Convert a dict to a message."""
+    if message_dict['role'] == 'system':
+        return SystemMessage(message_dict['content'])
+    elif message_dict['role'] == 'user':
+        return UserMessage(message_dict['content'])
+    elif message_dict['role'] == 'assistant':
+        if 'tool_calls' in message_dict:
+            tool_calls = [
+                ToolCall(
+                    tool_call['id'],
+                    tool_call['type'],
+                    tool_call['function']['name'],
+                    json.loads(tool_call['function']['arguments'])
+                )
+                for tool_call in message_dict['tool_calls']
+            ]
+        else:
+            tool_calls = None
+        return AssistantMessage(
+            message_dict['content'],
+            tool_calls
+        )
+    elif message_dict['role'] == 'tool':
+        return ToolMessage(message_dict['content'], message_dict['tool_call_id'])
+    else:
+        raise ValueError('Unknown message role: ' + message_dict['role'])
 
 
 def message_from_api_response(response: dict) -> AssistantMessage:
@@ -189,7 +218,7 @@ def start_chat(model: str, client: openai.Client) -> Callable:
     of the OpenAI API, e.g., `tools`, `temperature`, `seed`, etc."""
 
     def chat_func(messages: list[Message], *args, **kwargs) -> Message:
-        assert len(messages)>0
+        assert len(messages) > 0
         assert isinstance(messages[0], SystemMessage) or isinstance(messages[0], UserMessage)
         assert isinstance(messages[-1], UserMessage) or isinstance(messages[-1], ToolMessage)
 
