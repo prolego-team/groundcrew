@@ -1,14 +1,16 @@
 """
 Main agent class interacting with a user
 """
+import inspect
 import readline
 
 from typing import Any, Callable
 
+from yaspin import yaspin
 from chromadb import Collection
 
-from groundcrew import agent_utils as autils, system_prompts as sp
-from groundcrew.dataclasses import Config, Tool
+from groundcrew import agent_utils as autils, system_prompts as sp, utils
+from groundcrew.dataclasses import Colors, Config, Tool
 
 
 class Agent:
@@ -52,6 +54,28 @@ class Agent:
             }
         ]
 
+        self.colors = {
+            'system': Colors.YELLOW,
+            'user': Colors.GREEN,
+            'agent': Colors.BLUE
+        }
+
+    def print(self, text: str, role: str) -> None:
+        """
+        Helper function to print text with a given color and role.
+
+        Args:
+            text (str): The text to print.
+            role (str): The role of the text to print.
+
+        Returns:
+            None
+        """
+        print(self.colors[role])
+        print(f'[{role}]')
+        print(Colors.ENDC)
+        print(text)
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
@@ -59,16 +83,34 @@ class Agent:
         """
         while True:
 
-            user_prompt = input('> ')
-            if not user_prompt:
-                user_prompt = 'What is the name of the function that finds pdfs in a directory?'
+            user_prompt = ''
 
+            while user_prompt == '':
+                user_prompt = input('[user] > ')
+                if '\\code' in user_prompt:
+                    print(Colors.YELLOW)
+                    print('Code mode activated — type \end to submit')
+                    print(Colors.ENDC)
+                    user_prompt += '\n'
+
+                    line = input('')
+
+                    while '\\end' not in line:
+                        user_prompt += line + '\n'
+                        line = input('')
+
+            user_prompt = user_prompt.replace('\\code', '')
             self.messages.append({'role': 'user', 'content': user_prompt})
 
+            spinner = yaspin(text='Choosing tool...', color='green')
+            spinner.start()
             response = self.dispatch(user_prompt)
             self.messages.append({'role': 'assistant', 'content': response})
+            spinner.stop()
 
-            print(response)
+            # TODO - handle params that should be there but are not
+
+            self.print(response, 'agent')
 
     def dispatch(self, user_prompt: str) -> str:
         """
@@ -81,20 +123,27 @@ class Agent:
         Returns:
             str: The response from the tool or LLM.
         """
-        base_prompt = sp.CHOOSE_TOOL_PROMPT
-        base_prompt += '### Question ###\n'
-        base_prompt += user_prompt + '\n\n'
 
-        base_prompt += '### Tools ###\n'
+        dispatch_prompt = '### Tools ###\n'
         for tool in self.tools.values():
-            base_prompt += tool.to_yaml() + '\n\n'
+            dispatch_prompt += tool.to_yaml() + '\n\n'
 
-        dispatch_prompt = base_prompt
+        dispatch_prompt += '### Question ###\n'
+        dispatch_prompt += user_prompt + '\n\n'
+
+        # Put instructions at the end of the prompt
+        dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
 
         dispatch_messages = self.messages + [
             {'role': 'user', 'content': dispatch_prompt}
         ]
         dispatch_response = self.llm(dispatch_messages)
+
+        if self.config.debug:
+            print(Colors.MAGENTA)
+            print(dispatch_prompt, Colors.ENDC, '\n')
+            print(Colors.GREEN)
+            print(dispatch_response, Colors.ENDC)
 
         parsed_response = autils.parse_response(
             dispatch_response['content'],
@@ -108,10 +157,27 @@ class Agent:
 
             tool = self.tools[tool_selection]
             tool_args = self.extract_params(parsed_response)
-            print(f'Please standby while I run the tool {tool.name}...')
-            print(f'("{parsed_response["Tool query"]}", {tool_args})')
-            print()
-            response = tool.obj(parsed_response['Tool query'], **tool_args)
+
+            expected_tool_args = inspect.signature(tool.obj).parameters
+
+            # Filter out incorrect parameters
+            new_args = {}
+            for param_name, val in tool_args.items():
+                if param_name in expected_tool_args:
+                    new_args[param_name] = val
+            tool_args = new_args
+
+            if self.config.debug:
+                print(f'Please standby while I run the tool {tool.name}...')
+                print(f'("{parsed_response["Tool query"]}", {tool_args})')
+                print()
+            spinner = yaspin(text='Thinking...', color='green')
+            spinner.start()
+            response = utils.highlight_code(
+                tool.obj(parsed_response['Tool query'], **tool_args),
+                self.config.colorscheme
+            )
+            spinner.stop()
 
         elif 'Response' in parsed_response:
             response = parsed_response['Response']

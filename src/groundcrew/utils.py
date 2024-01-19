@@ -1,4 +1,5 @@
 """
+Utility functions
 """
 import os
 import ast
@@ -12,9 +13,64 @@ import astunparse
 
 from chromadb import Collection
 
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import Terminal256Formatter
+
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
 from groundcrew.llm import openaiapi
+
+
+def highlight_code_helper(text: str, colorscheme: str) -> str:
+    """
+    Highlights code in a given text string.
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    start_idx = text.find('```python')
+    end_idx = text.find('```', start_idx + 1)
+
+    # No python code found
+    if start_idx == end_idx == -1:
+        return text
+
+    code = ''
+    if '```python' in text:
+        code = text.split('```python')[1].split('```')[0]
+        code = highlight(
+            code,
+            PythonLexer(),
+            Terminal256Formatter(style=colorscheme, background='dark'))
+
+    return text[:start_idx] + code + text[end_idx + 3:]
+
+
+def highlight_code(text: str, colorscheme: str) -> str:
+    """
+    Uses the helper function to highlight code in a given text
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    if '```python' not in text:
+        return text
+
+    out = highlight_code_helper(text, colorscheme)
+
+    while '```python' in out:
+        out = highlight_code_helper(out, colorscheme)
+
+    return out
 
 
 def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[dict[str, str]], str]:
@@ -84,7 +140,8 @@ def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
         collection: Collection,
-        llm: Callable) -> dict[str, Tool]:
+        llm: Callable,
+        working_dir_path: str) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -103,7 +160,8 @@ def setup_tools(
     # Parameters available to a tool constructor
     params = {
         'collection': collection,
-        'llm': llm
+        'llm': llm,
+        'working_dir_path': working_dir_path
     }
 
     tools = {}
@@ -158,7 +216,7 @@ def setup_tools(
                 tool_obj = tool_constructor(**args)
 
                 # Check that the tool object has the correct signature
-                assert 'prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a prompt parameter'
+                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
 
                 assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
 
@@ -184,8 +242,7 @@ def convert_tool_str_to_yaml(function_str: str, llm: Callable) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
-    return llm(prompt)
+    return llm(sp.TOOL_GPT_PROMPT + '\n\n' + function_str)
 
 
 def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
