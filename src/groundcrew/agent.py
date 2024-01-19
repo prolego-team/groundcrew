@@ -11,6 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage
 
 
 class Agent:
@@ -43,16 +44,7 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages = [
-            {
-                'role': 'system',
-                'content': (
-                    'You are an assistant that answers question about a codebase. '
-                    'All of the user\'s questions should be about this particular '
-                    'codebase, and you will be given tools that you can use to help '
-                    'you answer questions about the codebase.')
-            }
-        ]
+        self.messages = [SystemMessage(sp.AGENT_PROMPT)]
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -100,12 +92,12 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-            self.messages.append({'role': 'user', 'content': user_prompt})
+            self.messages.append(UserMessage(user_prompt))
 
             spinner = yaspin(text='Thinking...', color='green')
             spinner.start()
             response = self.dispatch(user_prompt)
-            self.messages.append({'role': 'assistant', 'content': response})
+            self.messages.append(AssistantMessage(response))
             spinner.stop()
 
             # TODO - handle params that should be there but are not
@@ -114,8 +106,9 @@ class Agent:
 
     def dispatch(self, user_prompt: str) -> str:
         """
-        Analyze the user's input and choose an appropriate tool for generating
-        a response.
+        Analyze the user's input and and either respond or choose an appropriate
+        tool for generating a response. When a tool is called, the output from
+        the tool will be returned as the response.
 
         Args:
             user_prompt (str): The user's input or question.
@@ -134,9 +127,7 @@ class Agent:
         # Put instructions at the end of the prompt
         dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
 
-        dispatch_messages = self.messages + [
-            {'role': 'user', 'content': dispatch_prompt}
-        ]
+        dispatch_messages = self.messages + [UserMessage(dispatch_prompt)]
         dispatch_response = self.llm(dispatch_messages)
 
         if self.config.debug:
@@ -146,7 +137,7 @@ class Agent:
             print(dispatch_response, Colors.ENDC)
 
         parsed_response = autils.parse_response(
-            dispatch_response['content'],
+            dispatch_response,
             keywords=['Response', 'Reason', 'Tool', 'Tool query']
         )
 
@@ -177,8 +168,8 @@ class Agent:
             )
 
         else:
-            return utils.highlight_code(
-                dispatch_response['content'],
+            response = utils.highlight_code(
+                dispatch_response,
                 self.config.colorscheme
             )
 

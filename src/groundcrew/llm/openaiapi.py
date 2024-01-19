@@ -112,7 +112,7 @@ class UserMessage:
 @dataclass(frozen=True)
 class AssistantMessage:
     content: str
-    tool_calls: list[ToolCall] | None
+    tool_calls: list[ToolCall] | None = None
     role: str = 'assistant'
 
 

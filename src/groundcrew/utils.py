@@ -20,6 +20,7 @@ from pygments.formatters import Terminal256Formatter
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
 from groundcrew.llm import openaiapi
+from groundcrew.llm.openaiapi import Message
 
 
 def highlight_code_helper(text: str, colorscheme: str) -> str:
@@ -73,22 +74,21 @@ def highlight_code(text: str, colorscheme: str) -> str:
     return out
 
 
-def build_llm_chat_client(model: str = 'gpt-4-1106-preview') -> Callable[[dict[str, str]], str]:
+def build_llm_chat_client(model: str = sp.DEFAULT_MODEL) -> Callable[[list[Message]], str]:
     """Make an LLM client that accepts a list of messages and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()
         chat_session = openaiapi.start_chat(model, client)
 
-        def chat(messages: list[dict[str, str]]) -> str:
-            messages_openai = [openaiapi.dict_to_message(message) for message in messages]
-            response = chat_session(messages_openai)
+        def chat(messages: list[Message]) -> str:
+            response = chat_session(messages)
             messages.append(response)
-            return openaiapi.message_to_dict(response)
+            return response.content
 
     return chat
 
 
-def build_llm_completion_client(model: str = 'gpt-4-1106-preview') -> Callable[[str], str]:
+def build_llm_completion_client(model: str = sp.DEFAULT_MODEL) -> Callable[[str], str]:
     """Make an LLM client that accepts a string prompt and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()

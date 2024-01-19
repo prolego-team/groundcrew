@@ -1,6 +1,12 @@
 """
 """
 
+DEFAULT_MODEL = 'gpt-4-1106-preview'
+
+AGENT_PROMPT = """
+You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase.
+"""
+
 LINTER_PROMPT = """
 Use the linter output above to answer the following question in a few sentences.
 Do not engage in conversation.

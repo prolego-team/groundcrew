@@ -13,6 +13,7 @@ def parse_response(
 
     Args:
         text (str): The text to be parsed.
+        keywords (list[str]): A list of keywords to look for in the text.
 
     Returns:
         dict: A dictionary representation of the parsed text.
