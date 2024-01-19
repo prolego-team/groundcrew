@@ -9,6 +9,7 @@ from typing import Dict, List, Callable
 import datetime
 import os
 import re
+import sys
 import time
 
 import chromadb
@@ -17,10 +18,10 @@ import tqdm
 import yaml
 
 from groundcrew.dataclasses import Config
-from groundcrew import tools
 from groundcrew import code
 from groundcrew import constants
 from groundcrew import utils
+from groundcrew import tools
 
 
 @click.command()
@@ -67,38 +68,61 @@ def main(
     )
 
     # OpenAI models can't be created with a seed
+
     # so this is a simple wrapper that ignores the seed
     llm_from_seed = lambda _: utils.build_llm_client(model)
+    llm = utils.build_llm_client(model)
+
+    # When we load the tools, we want to ensure that we are generating new descriptions.
+    # So we'll use this breaking LLM.
+
+    def breaking_llm(x):
+        """Mock LLM that exits when called."""
+        print('missing tool description!')
+        sys.exit()
 
     tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
-    tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
-    tools_dict = utils.setup_tools(
-        config.Tools,
-        tool_descriptions,
-        collection,
-        llm,
-        config.repository
-    )
+    tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
 
+    tools_dict = {
+        'CodebaseQATool': lambda c, l: tools.CodebaseQATool(
+            base_prompt=tool_descs['CodebaseQATool']['base_prompt'],
+            collection=c,
+            llm=l
+        ),
+        'SingleDocstringTool': lambda c, l: tools.SingleDocstringTool(
+            base_prompt=tool_descs['SingleDocstringTool']['base_prompt'],
+            collection=c,
+            llm=l
+        ),
+        'LintFileTool': lambda c, l: tools.LintFileTool(
+            base_prompt=tool_descs['LintFileTool']['base_prompt'],
+            collection=c,
+            llm=l,
+            working_dir_path=config.repository
+        )
+    }
+
+    # build a set of evaluation functions
 
     eval_funcs_dict = dict(
-        match_word_any=match_word_any
+        match_word_any=match_word_any,
+        eval_with_llm=build_eval_with_llm(llm)
     )
 
     # ~~~~ run evaluations
 
     results = {}
 
-    # TODO: runs across multiple systems
-
     for suite in evals:
         results_suite = run_suite(
             suite=suite,
             n_runs=n_runs,
             eval_funcs_dict=eval_funcs_dict,
+
             collection=collection,
             llm_from_seed=llm_from_seed,
-            tools_dict=tools_dict,
+            tools_dict=tools_dict
         )
         results = {**results, **results_suite}
 
@@ -107,16 +131,16 @@ def main(
     output_file_prefix = 'eval'
     output_file_path = os.path.join(output_dir_path, f'{output_file_prefix}.csv')
     # header = 'suite,question,run,calls,time,missing,correct,answer\n'
-    header = 'suite,question,run,time,missing,correct,answer\n'
+    header = 'suite,test,run,time,missing,correct,answer\n'
     with open(output_file_path, 'w') as f:
         f.write(header)
-        for (suite_name, question, run_idx), info in results.items():
+        for (suite_name, test_name, run_idx), info in results.items():
             answer = info['answer']
             if answer is not None:
                 answer = answer.replace('\n', '%%%').replace('"', '``')
             line = [
                 f'"{suite_name}"',
-                f'"{question}"',
+                f'"{test_name}"',
                 run_idx,
                 # info['calls'],
                 info['time'],
@@ -139,9 +163,11 @@ def run_suite(
         suite: Dict,
         n_runs: int,
         eval_funcs_dict: Dict,
+
         collection: chromadb.Collection,
         llm_from_seed: Callable,
         tools_dict: Dict
+
         ) -> Dict:
     """run a test suite and return results"""
 
@@ -155,8 +181,9 @@ def run_suite(
 
     for test in tqdm.tqdm(suite['tests']):
         for run_idx in range(n_runs):
-            tool = tools_dict[test['tool']]
-            question = test['question']
+            test_name = test['name']
+            build_tool = tools_dict[test['tool']]
+            tool_params = test['params']
             eval_params = dict(test['eval_func'])
             eval_func = eval_funcs_dict[eval_params['typ']]
             del eval_params['typ']
@@ -166,8 +193,10 @@ def run_suite(
             start_time = time.time()
 
             try:
-                answer = tool(question, collection, llm)
+                tool = build_tool(collection, llm)
+                answer = tool(**tool_params)
             except Exception as e:
+                print('exception while running tool:', e)
                 answer = None
 
             end_time = time.time()
@@ -190,7 +219,7 @@ def run_suite(
                 info['correct'] = False
                 success.append(False)
 
-            uid = (suite_name, question, run_idx)
+            uid = (suite_name, test_name, run_idx)
             results[uid] = info
 
     print(sum(success), '/', len(success), 'passed')
@@ -215,6 +244,32 @@ def match_word_any(text: str, words: List[str], strip_quotes: bool) -> bool:
         if word in text_words:
             return True
     return False
+
+
+def build_eval_with_llm(llm: Callable) -> Callable:
+    """
+    Build an evaluation function that uses an LLM to perform
+    potentially more complex evaluations.
+    """
+    def eval_with_llm(text: str, instructions: str) -> bool:
+        """
+        Evaluate a result using and LLM and instructions.
+        """
+
+        prompt = (
+            f'### Text ###\n{text}\n\n' +
+            f'### Evaluation Instructions ###\n{instructions}\n\n' +
+            'Your task is to evaluate the above Text given the Instructions. ' +
+            'If the text satisfies the instructions, answer "yes" otherwise answer "no".'
+        )
+
+        res = llm(prompt)
+        res = res.lower()
+        if 'yes' in res:
+            return True
+        return False
+
+    return eval_with_llm
 
 
 if __name__ == '__main__':

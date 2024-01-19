@@ -208,6 +208,11 @@ def main(config: str, model: str):
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
 
+        if 'llmtools' not in filepath:
+            continue
+
+        summarize_file(filepath, llm, descriptions)
+
         # TODO - remove before merging
         #if 'examples' in filepath:
         #    continue
