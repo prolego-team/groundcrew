@@ -38,6 +38,8 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
     metadatas = []
     documents = []
 
+    print(descriptions.keys())
+
     # Create ids, metadata, and documents
     # Name is a unique identifier
     for name, info in descriptions.items():
@@ -67,8 +69,6 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
 
         # The document is the LLM generated summary
         documents.append(info['summary'])
-
-        break
 
     collection.upsert(
         documents=documents,

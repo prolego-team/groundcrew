@@ -68,6 +68,12 @@ def main(
         embedding_function=constants.DEFAULT_EF
     )
 
+    res = collection.get()
+
+    # print(len(res['metadatas']))
+    # print(res['ids'])
+    #exit()
+
     # OpenAI models can't be created with a seed
     # so this is a simple wrapper that ignores the seed
     llm_from_seed = lambda _: utils.build_llm_client(model)
