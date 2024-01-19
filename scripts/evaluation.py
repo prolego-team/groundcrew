@@ -65,7 +65,7 @@ def main(
 
     collection = client.get_or_create_collection(
         name=constants.DEFAULT_COLLECTION_NAME,
-        embedding_function=code.DEFAULT_EF
+        embedding_function=constants.DEFAULT_EF
     )
 
     # OpenAI models can't be created with a seed
