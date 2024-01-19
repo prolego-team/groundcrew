@@ -211,7 +211,10 @@ def main(config: str, model: str):
         if 'llmtools' not in filepath:
             continue
 
-        if 'pdf_utils' not in filepath:
+        # if 'pdf_utils' not in filepath:
+        #     continue
+
+        if ('openaiapi' not in filepath) and ('pdf_utils' not in filepath):
             continue
 
         summarize_file(filepath, llm, descriptions)
