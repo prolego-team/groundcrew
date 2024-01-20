@@ -190,7 +190,7 @@ def main(config: str, model: str):
     files = sorted(files)
 
     # LLM that takes a string as input and returns a string
-    llm = utils.build_llm_client(model)
+    llm = utils.build_llm_completion_client(model)
 
     # File for storing LLM generated descriptions of files, functions, and
     # classes
@@ -208,14 +208,14 @@ def main(config: str, model: str):
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
 
-        if 'llmtools' not in filepath:
-            continue
+        # if 'llmtools' not in filepath:
+        #     continue
 
         # if 'pdf_utils' not in filepath:
         #     continue
 
-        if ('openaiapi' not in filepath) and ('pdf_utils' not in filepath):
-            continue
+        # if ('openaiapi' not in filepath) and ('pdf_utils' not in filepath):
+        #     continue
 
         summarize_file(filepath, llm, descriptions)
 
@@ -254,7 +254,10 @@ def main(config: str, model: str):
     )
     utils.save_tools_to_yaml(tools, tools_filepath)
 
-    agent = Agent(config, collection, llm, tools)
+    # The agent LLM is a chat LLM that takes a list of messages as input and
+    # returns a message
+    agent_chat_llm = utils.build_llm_chat_client(model)
+    agent = Agent(config, collection, agent_chat_llm, tools)
     agent.run()
 
 

@@ -15,6 +15,7 @@ import time
 
 import chromadb
 import click
+import git
 import tqdm
 import yaml
 
@@ -23,6 +24,10 @@ from groundcrew import code
 from groundcrew import constants
 from groundcrew import utils
 from groundcrew import tools
+
+# TODO: find a better place for this
+#       Maybe in the eval config?
+REPO_COMMIT_HASH = '5b5b2c6d16e94edae7a03fac2a666b95713c1904'
 
 
 @click.command()
@@ -45,14 +50,23 @@ def main(
     output_dir_path = f'{output_dir_prefix}_{timestamp}'
     os.makedirs(output_dir_path, exist_ok=False)
 
-    # ~~~~ build the system (collection, llm, etc)
+    # ~~~~ load config ~~~~
 
-    # For now we'll assume that `run.py` has been run
-    # and the database is present
+    # TODO: maybe this should be specified in an eval config
 
     with open(config, 'r') as f:
         config = yaml.safe_load(f)
     config = Config(**config)
+
+    # ~~~~ check the code version of the repo we are going to test
+
+    repo = git.Repo(config.repository)
+    assert repo.head.commit.hexsha == REPO_COMMIT_HASH
+
+    # ~~~~ build the system (collection, llm, etc)
+
+    # For now we'll assume that `run.py` has been run
+    # and the database is present
 
     with open(evals, 'r') as f:
         evals = yaml.safe_load(f)
