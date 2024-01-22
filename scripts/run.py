@@ -205,8 +205,6 @@ def main(config: str, model: str):
 
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
-        # filepath = opj(config.repository, filepath)
-
         # if 'llmtools' not in filepath:
         #     continue
 
