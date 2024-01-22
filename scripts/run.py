@@ -205,29 +205,7 @@ def main(config: str, model: str):
 
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
-        # if 'llmtools' not in filepath:
-        #     continue
-
-        # if 'pdf_utils' not in filepath:
-        #     continue
-
-        # if ('openaiapi' not in filepath) and ('pdf_utils' not in filepath):
-        #     continue
-
         summarize_file(filepath, config.repository, llm, descriptions)
-
-        # TODO - remove before merging
-        #if 'examples' in filepath:
-        #    continue
-        #if 'src/neosophia/agents' not in filepath:
-        #    continue
-        #if 'test_' in filepath:
-        #    continue
-        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
-
-        #if i > 3:
-        #    break
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:
