@@ -3,9 +3,10 @@
 import os
 import ast
 
+import tqdm
 from git import Repo
 
-from groundcrew.constants import DEFAULT_EF
+from groundcrew.constants import DEFAULT_EF, CLASS_NODE_TYPE, FUNCTION_NODE_TYPE
 from groundcrew.dataclasses import Chunk
 from groundcrew.code_utils import get_imports_from_code, import_called_as
 
@@ -68,46 +69,11 @@ def extract_python_from_file(file_text, node_type):
     return texts
 
 
-def generate_function_descriptions(
-        llm: Callable[[str], str],
-        function_descriptions: Dict[str, str],
-        repository: str,
-        files: List[str]) -> Dict[str, str]:
-
-    for file in tqdm(files):
-        filepath = opj(repository, file)
-
-        # TODO - more functions for different file types
-        if not filepath.endswith('.py'):
-            continue
-
-        # TODO - remove
-        if 'llmtools' not in filepath:
-            continue
-
-        file_functions = extract_python_functions_from_file(filepath)
-
-        for function_name, function_info in file_functions.items():
-            function_text = function_info['text']
-            function_id = file + '::' + function_name
-
-            if function_id in function_descriptions:
-                continue
-
-            prompt = 'Generate a human readable description for the following Python function.\n'
-            prompt += 'Function ID: ' + function_id
-            prompt += 'Function Text:\n' + function_text
-            function_descriptions[function_id] = f'Function_id: {function_id}\n'
-            function_descriptions[function_id] += llm(prompt)
-
-    return function_descriptions
-
-
 def find_object_use(
-        filepaths: List[str],
+        filepaths: list[str],
         package_module_name: str,
         object_name: str
-    ) -> Dict[str, List[str]]:
+    ) -> dict[str, list[str]]:
     """Returns a dictionary of filepaths to lines where the object is called."""
     function_use = {}
 
@@ -131,15 +97,10 @@ def find_object_use(
     return function_use
 
 
-def init_db(client: chromadb.Client, repository: str) -> tuple[chromadb.Collection, list[str]]:
-
-    # Get the committed files from the repo
-    files = list(get_committed_files(repository, exts))
-    files = [x.split(os.path.abspath(repository))[1][1:] for x in files]
+def init_db(client, repository, exts):
 
     collection = client.get_or_create_collection(
         name='database', embedding_function=DEFAULT_EF
     )
 
-    return collection, files
-
+    return collection

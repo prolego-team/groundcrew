@@ -117,6 +117,22 @@ class CodebaseQATool(ToolBase):
         ]
 
 
+class CyclomaticComplexity(ToolBase):
+    """
+    Tool for computing the cyclomatic complexity of a codebase.
+    """
+    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
+        super().__init__(base_prompt, collection, llm)
+
+    def __call__(self, prompt: str, **kwargs):
+        """The call method"""
+        chunks = self.query_codebase(prompt)
+        code_dict = {}
+        for chunk in chunks:
+            code_dict[chunk.uid] = chunk.text
+
+        return cyclomatic_complexity(code_dict)
+
 def cyclomatic_complexity(code: str) -> dict:
     """Compute the cyclomatic complexity of a piece of code."""
     v = ComplexityVisitor.from_code(code)
