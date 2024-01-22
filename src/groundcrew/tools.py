@@ -7,11 +7,11 @@ import subprocess
 from typing import Callable
 
 from chromadb.api.models.Collection import Collection
-from radon.visitors import ComplexityVisitor
 from thefuzz import process as fuzzprocess
 from chromadb import Collection
 
 from groundcrew import code, system_prompts as sp
+from groundcrew.code_utils import cyclomatic_complexity
 from groundcrew.dataclasses import Chunk
 
 
@@ -319,38 +319,80 @@ class CyclomaticComplexity:
     """
     Tool for computing the cyclomatic complexity of a codebase.
     """
-    def __init__(self, base_prompt: str, collection: Collection, llm: Callable):
-        super().__init__(base_prompt, collection, llm)
+    # start with a single component
+    # filter collections, compute complexity
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable,
+            min_complexity: int = 11
+        ):
+        self.collection = collection
+        self.llm = llm
+        self.base_prompt = base_prompt
+        self.min_complexity = min_complexity
 
-    def __call__(self, prompt: str, **kwargs):
+    def __call__(self, user_prompt: str) -> str:
         """The call method"""
-        chunks = self.query_codebase(prompt)
-        code_dict = {}
-        for chunk in chunks:
-            code_dict[chunk.uid] = chunk.text
+        files = self.get_files()
 
-        return cyclomatic_complexity(code_dict)
+        file_complexity = {}
+        for file, source_code in files.items():
+            complexity_dict = cyclomatic_complexity(source_code)
+            total_complexity = sum(complexity_dict[obj]['complexity'] for obj in complexity_dict)
+            max_complexity = max(complexity_dict[obj]['complexity'] for obj in complexity_dict)
+            if total_complexity > self.min_complexity:
+                file_complexity[file] = {
+                    'total': total_complexity,
+                    'max': max_complexity,
+                    'details': complexity_dict
+                }
 
-def cyclomatic_complexity(code: str) -> dict:
-    """Compute the cyclomatic complexity of a piece of code."""
-    v = ComplexityVisitor.from_code(code)
-    output = {}
-    for func in v.functions:
-        output[func.name] = {
-            'object': 'function',
-            'complexity': func.complexity
+        sorted_complexity = sorted(file_complexity.items(), key=lambda x: x[1]['total'], reverse=True)
+
+        summary_str = ''
+        for file, complexity in sorted_complexity:
+            summary_str += (
+                f'File: {file}; '
+                f'total complexity = {file_complexity[file]["total"]}; '
+                f'max complexity = {file_complexity[file]["max"]}\n'
+            )
+            for name, desc in file_complexity[file]['details'].items():
+                if desc['object'] == 'function':
+                    summary_str += f'  {name}: {desc["complexity"]}\n'
+                elif desc['object'] == 'class':
+                    summary_str += f'  {name}: {desc["complexity"]}\n'
+                    for method, method_desc in desc['methods'].items():
+                        summary_str += f'    {name}.{method}: {method_desc["complexity"]}'
+
+
+        return summary_str
+
+
+    def get_files(self):
+        """Get items from the collection"""
+        all_items = self.collection.get(
+            include=['metadatas'],
+            where={'type': 'file'}
+        )
+
+        return {
+            id_: metadata['text']
+            for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
         }
 
-    for clss in v.classes:
-        output[clss.name] = {
-            'object': 'class',
-            'complexity': clss.complexity,
-            'methods': {}
-        }
-        for meth in clss.methods:
-            output[clss.name]['methods'][meth.name] = {
-                'complexity': meth.complexity
-            }
+    def get_objects_in_file(self, file_id: str):
+        """Get items from the collection"""
+        all_items = self.collection.get(
+            include=['metadatas'],
+            where={'filepath': {'$contains': file_id}}
+        )
 
-    return output
+        return {
+            id_: metadata['text']
+            for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
+        }
+
+
 

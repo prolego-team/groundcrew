@@ -48,6 +48,8 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
             data_type = 'class'
         elif name.endswith(' (function)'):
             data_type = 'function'
+        elif name.endswith(' (method)'):
+            data_type = 'method'
 
         filepath = name.split('::')[0]
 
@@ -207,14 +209,14 @@ def main(config: str, model: str):
         filepath = opj(config.repository, filepath)
 
         # TODO - remove before merging
-        #if 'examples' in filepath:
-        #    continue
-        #if 'src/neosophia/agents' not in filepath:
-        #    continue
-        #if 'test_' in filepath:
-        #    continue
-        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
+        if 'examples' in filepath:
+           continue
+        if 'src/neosophia/agents' not in filepath:
+           continue
+        if 'test_' in filepath:
+           continue
+        if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
+           summarize_file(filepath, llm, descriptions)
 
         #if i > 3:
         #    break
@@ -228,6 +230,18 @@ def main(config: str, model: str):
         descriptions,
         collection
     )
+
+    all_entries = collection.get(
+        include=['metadatas']
+    )
+
+    x = {
+        x: y
+        for x, y in zip(all_entries['ids'], all_entries['metadatas'])
+        if 'method' in x
+    }
+    print(x)
+    print()
 
     # Load or generate Tools
     tools_filepath = opj(config.cache_dir, 'tools.yaml')

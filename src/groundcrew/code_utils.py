@@ -2,6 +2,8 @@ import ast
 
 from dataclasses import dataclass
 
+from radon.visitors import ComplexityVisitor
+
 
 @dataclass
 class Import:
@@ -69,3 +71,27 @@ def import_called_as(imports: list[Import], module: str, entity: str) -> str:
             return imp.asname
 
     return None
+
+
+def cyclomatic_complexity(code: str) -> dict:
+    """Compute the cyclomatic complexity of a piece of code."""
+    v = ComplexityVisitor.from_code(code)
+    output = {}
+    for func in v.functions:
+        output[func.name] = {
+            'object': 'function',
+            'complexity': func.complexity
+        }
+
+    for clss in v.classes:
+        output[clss.name] = {
+            'object': 'class',
+            'complexity': clss.complexity,
+            'methods': {}
+        }
+        for meth in clss.methods:
+            output[clss.name]['methods'][meth.name] = {
+                'complexity': meth.complexity
+            }
+
+    return output
