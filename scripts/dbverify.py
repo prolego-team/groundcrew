@@ -34,7 +34,6 @@ def main(config: str):
     file_paths = list(code.get_committed_files(config.repository, config.extensions))
     file_paths = [x.split(os.path.abspath(config.repository))[1][1:] for x in file_paths]
 
-
     # client and collection
     client = chromadb.PersistentClient(config.db_path)
     collection = client.get_or_create_collection(
