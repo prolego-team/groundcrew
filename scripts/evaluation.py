@@ -82,8 +82,7 @@ def main(
         embedding_function=constants.DEFAULT_EF
     )
 
-    res = collection.get()
-
+    # res = collection.get()
     # print(len(res['metadatas']))
     # print(res['ids'])
     #exit()
