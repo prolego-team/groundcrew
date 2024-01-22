@@ -11,7 +11,8 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage
+from groundcrew.llm.openaiapi import (AssistantMessage, SystemMessage,
+                                      UserMessage)
 
 
 class Agent:
@@ -68,6 +69,23 @@ class Agent:
         print(Colors.ENDC)
         print(text)
 
+    def interact(self, user_prompt: str) -> None:
+        """
+        Process a user prompt and call dispatch
+
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            None
+        """
+        self.messages.append(UserMessage(user_prompt))
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
+        response = self.dispatch(user_prompt)
+        self.messages.append(AssistantMessage(response))
+        spinner.stop()
+        self.print(response, 'agent')
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
@@ -92,17 +110,32 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-            self.messages.append(UserMessage(user_prompt))
 
-            spinner = yaspin(text='Thinking...', color='green')
-            spinner.start()
-            response = self.dispatch(user_prompt)
-            self.messages.append(AssistantMessage(response))
-            spinner.stop()
+            self.interact(user_prompt)
 
             # TODO - handle params that should be there but are not
 
-            self.print(response, 'agent')
+    def run_with_prompts(self, prompts: list[str]):
+        """
+        Process a list of user prompts and respond using the chosen tool
+        based on the input.
+
+        Args:
+            prompts (List[str]): List of prompts to be processed by the agent.
+        """
+        for i, user_prompt in enumerate(prompts):
+
+            if i == 0:
+                self.print(user_prompt, 'user')
+
+            self.interact(user_prompt)
+
+            if i < len(prompts) - 1:
+                print('Next prompt:')
+                self.print(prompts[i + 1], 'user')
+                input('\nPress enter to continue...\n')
+
+        self.run()
 
     def dispatch(self, user_prompt: str) -> str:
         """
@@ -132,7 +165,7 @@ class Agent:
 
         if self.config.debug:
             print(Colors.MAGENTA)
-            print(dispatch_prompt, Colors.ENDC, '\n')
+            print(dispatch_messages, Colors.ENDC, '\n')
             print(Colors.GREEN)
             print(dispatch_response, Colors.ENDC)
 

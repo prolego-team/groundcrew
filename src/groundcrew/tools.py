@@ -2,8 +2,8 @@
 File for Tools
 """
 import os
-
 import subprocess
+
 from typing import Callable
 
 from thefuzz import process as fuzzprocess
@@ -189,13 +189,15 @@ class SingleDocstringTool:
     def __call__(
             self,
             user_prompt: str,
+            code: str = 'none',
             filename: str = 'none',
             function_name: str = 'none') -> str:
         """
-        Generate docstrings for a given function, or all functions in a given
-        file.
+        Generate docstrings for a given snippet of code, a function, or all
+        functions in a given file.
 
         Scenarios:
+            - code is not 'none': generate docstrings for the given code
             - filename is not 'none', function_name is 'none': generate
               docstrings for all functions in the file
             - filename is not 'none', function_name is not 'none': search for
@@ -205,7 +207,8 @@ class SingleDocstringTool:
             - filename is 'none', function_name is 'none': assumes the
               user_prompt includes code and generates the docstring for that
         Args:
-            prompt (str): The prompt to process.
+            user_prompt (str): The prompt to process.
+            code (str): The code to generate a docstring for.
             filename (str): A filename to query and generate docstrings for all
             functions within the file. If empty, pass "none".
             function_name (str): The name of the function to generate a
@@ -215,53 +218,85 @@ class SingleDocstringTool:
             str: The generated response from the language model.
         """
 
+        # Get all of the IDs of the functions in the database
         all_ids = self.collection.get()['ids']
 
-        # Flag for generating docstrings for all functions in a file
-        all_functions = False
-        if function_name == 'none':
-            all_functions = True
+        # Determine the context based on input parameters
+        context = self._determine_context(filename, function_name, code)
 
-        # IDs of the files/functions to generate docstrings for
-        filtered_ids = []
-        if filename != 'none':
-            for id_ in all_ids:
-
-                # This will match with all functions in the given file
-                if all_functions and '::' in id_ and get_filename_from_id(id_) == filename:
-                    filtered_ids.append(id_)
-
-                # This will match with a single function in the given file
-                elif not all_functions and f'::{function_name}' in id_ and get_filename_from_id(id_) == filename:
-                    filtered_ids.append(id_)
-
-        # No filename was given, find the function(s) given
-        elif filename == 'none' and function_name != 'none':
-            for id_ in all_ids:
-
-                # If '::' isn't in the ID then it's a file
-                if '::' not in id_:
-                    continue
-
-                if function_name in id_:
-                    filtered_ids.append(id_)
-
-        # User included code in their prompt so no filename or function needed
-        if filename == 'none' and function_name == 'none':
-            function_code = [user_prompt]
-        else:
-            function_code = []
-            for id_ in filtered_ids:
-                item = self.collection.get(id_)
-                function_code.append(item['metadatas'][0]['text'] + '\n')
-
-        if not function_code:
+        if context == 'no_match':
             return 'No matching functions found.'
 
-        function_code = '\n'.join(function_code)
-        prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
+        # Get the function code we want to generate a docstring for
+        function_code = self._get_function_code(
+            all_ids, filename, function_name, code, context)
 
+        prompt = function_code + '\n### Task ###\n' + self.base_prompt + '\n'
         return self.llm(prompt)
+
+    def _determine_context(
+            self, filename: str, function_name: str, code: str) -> str:
+        if code != 'none':
+            return 'code'
+        if filename == 'none' and function_name != 'none':
+            return 'function'
+        if filename != 'none':
+            return 'file'
+        return 'no_match'
+
+    def _get_function_code(
+            self,
+            all_ids: list[str],
+            filename: str,
+            function_name: str,
+            code: str,
+            context: str) -> str:
+
+        function_code = []
+
+        if context == 'code':
+            return code
+
+        filtered_ids = []
+        for id_ in all_ids:
+
+            # Adding all functions in the given file
+            if context == 'file' and self._id_matches_file(
+                    id_, filename, function_name):
+                filtered_ids.append(id_)
+
+            # Adding just the function that we're looking for
+            elif context == 'function' and self._id_matches_function(
+                    id_, function_name):
+                filtered_ids.append(id_)
+
+        for id_ in filtered_ids:
+            item = self.collection.get(id_)
+            function_code.append(item['metadatas'][0]['text'] + '\n')
+
+        return '\n'.join(function_code)
+
+    def _id_matches_file(
+            self,
+            id_: str,
+            filename: str,
+            function_name: str) -> bool:
+        """
+        Checks if an ID matches a given filename
+
+        Args:
+            id_ (str): The ID to check.
+            filename (str): The filename to check against.
+            function_name (str): The optional function name to check against.
+            If function_name is 'none', then this will add all functions in the
+            matched file
+        """
+        if '::' in id_ and get_filename_from_id(id_) == filename:
+            return True if function_name == 'none' or f'::{function_name}' in id_ else False
+        return False
+
+    def _id_matches_function(self, id_: str, function_name: str) -> bool:
+        return '::' in id_ and function_name in id_
 
 
 class CodebaseQATool:

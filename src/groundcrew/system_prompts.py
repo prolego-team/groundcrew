@@ -27,7 +27,7 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to either (1) respond directly to the user's question or (2) choose the correct tool and parameters to answer the following question. Do not engage in any conversation. Your answer must be in one of the following two formats.
+CHOOSE_TOOL_PROMPT = """Your task is to either (1) respond directly to the user's question or (2) choose the correct tool and parameters to answer the following question. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. Do not engage in any conversation. Your answer must be in one of the following two formats.
 
 (1) If you are responding directly to the user's questions, use this format:
 Response: Write your response here. Your response should be limited to 3 sentences or less. If you include code in your response, it should be in a code block like this:

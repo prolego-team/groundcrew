@@ -166,7 +166,8 @@ def summarize_file(
 @click.command()
 @click.option('--config', '-c', default='config.yaml')
 @click.option('--model', '-m', default='gpt-4-1106-preview')
-def main(config: str, model: str):
+@click.option('--prompts_file', '-p', default=None)
+def main(config: str, model: str, prompts_file: str):
     """
     Main run script
 
@@ -207,7 +208,7 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
-        summarize_file(filepath, llm, descriptions)
+        #summarize_file(filepath, llm, descriptions)
 
         # TODO - remove before merging
         #if 'examples' in filepath:
@@ -218,8 +219,8 @@ def main(config: str, model: str):
         #    continue
         #if 'tools.py' in filepath or 'util.py' in filepath:
         #    summarize_file(filepath, llm, descriptions)
-        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
+        if 'agents/agent.py' in filepath:
+            summarize_file(filepath, llm, descriptions)
         #if i > 3:
         #    break
 
@@ -249,7 +250,16 @@ def main(config: str, model: str):
     # returns a message
     agent_chat_llm = utils.build_llm_chat_client(model)
     agent = Agent(config, collection, agent_chat_llm, tools)
-    agent.run()
+
+    # Prompts file was provided for testing
+    if prompts_file is not None:
+        with open(prompts_file, 'r') as f:
+            prompts = []
+            for line in f.readlines():
+                prompts.append(line.strip())
+        agent.run_with_prompts(prompts)
+    else:
+        agent.run()
 
 
 if __name__ == '__main__':
