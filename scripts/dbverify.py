@@ -79,6 +79,35 @@ def main(config: str):
     print('repo file paths:', len(file_paths))
     print('matches:', len(set(file_ids).intersection(set(file_paths))))
 
+    import pickle
+
+    # look at descriptions in cache and fix them!
+
+    descriptions_file = os.path.join(config.cache_dir, 'descriptions.pkl')
+    with open(descriptions_file, 'rb') as f:
+        descriptions = pickle.load(f)
+
+    print(descriptions.keys())
+
+    descriptions_fixed = {}
+    fixed_count = 0
+    for k, v in descriptions.items():
+        if k.startswith(config.repository):
+            k_fixed = os.path.relpath(k, config.repository)
+            print(k, '->', k_fixed)
+            assert k == (config.repository + '/' + k_fixed)
+            fixed_count += 1
+            k = k_fixed
+        descriptions_fixed[k] = v
+
+    print('fixed keys of', fixed_count, '/', len(descriptions_fixed), 'descriptions')
+
+    assert len(set(descriptions.keys())) == len(set(descriptions_fixed.keys()))
+
+    if fixed_count > 0:
+        with open(descriptions_file, 'wb') as f:
+            pickle.dump(descriptions_fixed, f)
+
 
 if __name__ == '__main__':
     main()
