@@ -1,7 +1,9 @@
 """
+Utility functions
 """
 import os
 import ast
+import inspect
 import importlib
 
 from typing import Any, Callable
@@ -9,28 +11,96 @@ from typing import Any, Callable
 import yaml
 import astunparse
 
-from openai import OpenAI
+from chromadb import Collection
+
+from pygments import highlight
+from pygments.lexers import PythonLexer
+from pygments.formatters import Terminal256Formatter
 
 from groundcrew import system_prompts as sp
 from groundcrew.dataclasses import Tool
+from groundcrew.llm import openaiapi
+from groundcrew.llm.openaiapi import Message
 
 
-def build_llm_client(model: str='gpt-4-1106-preview'):
+def highlight_code_helper(text: str, colorscheme: str) -> str:
+    """
+    Highlights code in a given text string.
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
     """
 
+    start_idx = text.find('```python')
+    end_idx = text.find('```', start_idx + 1)
+
+    # No python code found
+    if start_idx == end_idx == -1:
+        return text
+
+    code = ''
+    if '```python' in text:
+        code = text.split('```python')[1].split('```')[0]
+        code = highlight(
+            code,
+            PythonLexer(),
+            Terminal256Formatter(style=colorscheme, background='dark'))
+
+    return text[:start_idx] + code + text[end_idx + 3:]
+
+
+def highlight_code(text: str, colorscheme: str) -> str:
     """
+    Uses the helper function to highlight code in a given text
+
+    Args:
+        text (str): The text optionally including code to highlight.
+        colorscheme (str): The colorscheme to use for highlighting.
+    Returns:
+        str: The text with code highlighted.
+    """
+
+    if '```python' not in text:
+        return text
+
+    out = highlight_code_helper(text, colorscheme)
+
+    while '```python' in out:
+        out = highlight_code_helper(out, colorscheme)
+
+    return out
+
+
+def build_llm_chat_client(model: str = sp.DEFAULT_MODEL) -> Callable[[list[Message]], str]:
+    """Make an LLM client that accepts a list of messages and returns a response."""
     if 'gpt' in model:
-        client = OpenAI()
+        client = openaiapi.get_openaiai_client()
+        chat_session = openaiapi.start_chat(model, client)
+
+        def chat(messages: list[Message]) -> str:
+            response = chat_session(messages)
+            messages.append(response)
+            return response.content
+
+    return chat
+
+
+def build_llm_completion_client(model: str = sp.DEFAULT_MODEL) -> Callable[[str], str]:
+    """Make an LLM client that accepts a string prompt and returns a response."""
+    if 'gpt' in model:
+        client = openaiapi.get_openaiai_client()
+        completion = openaiapi.start_chat(model, client)
 
         def chat_complete(prompt):
-            complete = client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            return complete.choices[0].message.content
+            messages = [
+                openaiapi.SystemMessage("You are a helpful assistant."),
+                openaiapi.UserMessage(prompt)
+            ]
+            response = completion(messages)
+            return response.content
 
     return chat_complete
 
@@ -69,8 +139,9 @@ def setup_and_load_yaml(filepath: str, key: str) -> dict[str, dict[str, Any]]:
 def setup_tools(
         modules_list: list[dict[str, Any]],
         tool_descriptions: dict[str, dict[str, str]],
-        collection,
-        llm: Callable) -> dict[str, Tool]:
+        collection: Collection,
+        llm: Callable,
+        working_dir_path: str) -> dict[str, Tool]:
     """
     This function sets up tools by generating a dictionary of Tool objects
     based on the given modules and tool descriptions.
@@ -84,8 +155,14 @@ def setup_tools(
     Returns:
         tools (dict): A dictionary containing Tools with each key being the
         tool name
-
     """
+
+    # Parameters available to a tool constructor
+    params = {
+        'collection': collection,
+        'llm': llm,
+        'working_dir_path': working_dir_path
+    }
 
     tools = {}
     for module_dict in modules_list:
@@ -125,10 +202,25 @@ def setup_tools(
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
 
-                # Create an instance of the Tool object
-                tool_obj = getattr(module, node.name)(
-                    tool_info_dict['base_prompt'], collection, llm)
+                params['base_prompt'] = tool_info_dict['base_prompt']
 
+                tool_constructor = getattr(module, node.name)
+                tool_params = inspect.signature(tool_constructor).parameters
+
+                args = {}
+                for param_name, value in params.items():
+                    if param_name in tool_params:
+                        args[param_name] = value
+
+                # Create an instance of a tool object
+                tool_obj = tool_constructor(**args)
+
+                # Check that the tool object has the correct signature
+                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
+
+                assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
+
+                # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
                     name=node.name,
                     code=tool_code,
@@ -150,8 +242,7 @@ def convert_tool_str_to_yaml(function_str: str, llm: Callable) -> str:
     Returns:
         str: The YAML representation of the given function string.
     """
-    prompt = sp.TOOL_GPT_PROMPT + '\n\n' + function_str
-    return llm(prompt)
+    return llm(sp.TOOL_GPT_PROMPT + '\n\n' + function_str)
 
 
 def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
@@ -184,4 +275,3 @@ def save_tools_to_yaml(tools: dict[str, Tool], filename: str) -> None:
     with open(filename, 'w') as file:
         yaml.dump(data, file, default_flow_style=False, sort_keys=False)
     print(f'Saved {filename}\n')
-

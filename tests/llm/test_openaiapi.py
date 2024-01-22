@@ -171,6 +171,33 @@ def test_message_to_dict():
     }]
 
 
+def test_dict_to_message():
+    dict = {'role': 'user', 'content': 'This is a test.'}
+    message = openaiapi.UserMessage('This is a test.')
+    assert openaiapi.dict_to_message(dict)==message
+
+    dict = {'role': 'assistant', 'content': 'This is a test.'}
+    message = openaiapi.AssistantMessage('This is a test.', None)
+    assert openaiapi.dict_to_message(dict)==message
+
+    dict = {
+        'role': 'assistant',
+        'content': 'This is a test.',
+        'tool_calls': [
+            {
+                'id': 'tcid',
+                'type': 'function',
+                'function': {'name': 'func_name', 'arguments': '{"arg1": 42}'}
+            },
+        ]
+    }
+    message = openaiapi.AssistantMessage(
+        'This is a test.',
+        [openaiapi.ToolCall('tcid', 'function', 'func_name', {'arg1': 42})]
+    )
+    assert openaiapi.dict_to_message(dict)==message
+
+
 @patch('groundcrew.llm.openaiapi.openai.resources.chat.completions.Completions.create')
 def test_chat_completion(chat_mock, openai_chat_response, openai_tool_response):
     target_output_content = 'Who is there?'

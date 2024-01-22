@@ -6,3 +6,7 @@ Tools:
   - module: groundcrew.tools
     tools:
       - CodebaseQATool
+      - SingleDocstringTool
+      - LintFileTool
+colorscheme: 'gruvbox-dark'
+debug: false

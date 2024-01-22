@@ -11,7 +11,7 @@ import yaml
 import click
 import chromadb
 
-from chromadb.api.models.Collection import Collection
+from chromadb import Collection
 
 from groundcrew import system_prompts as sp, utils
 from groundcrew.code import extract_python_from_file, init_db
@@ -115,9 +115,14 @@ def summarize_file(
         functions_dict = extract_python_from_file(file_text, FUNCTION_NODE_TYPE)
 
         classes_dict = {k + ' (class)': v for k, v in classes_dict.items()}
-        functions_dict = {
-            k + ' (function)': v for k, v in functions_dict.items()
-        }
+
+        new_functions_dict = {}
+        for k, v in functions_dict.items():
+            suffix = ' (function)'
+            if v['is_method']:
+                suffix = ' (method)'
+            new_functions_dict[k + suffix] = v
+        functions_dict = new_functions_dict
 
         # Combine classes and functions dictionaries
         code_dict = {**classes_dict, **functions_dict}
@@ -134,6 +139,8 @@ def summarize_file(
                 info['summary'] = llm(prompt)
                 descriptions[key] = info
             else:
+                info['summary'] = descriptions[key]['summary']
+                descriptions[key] = info
                 print('Loading summary for', key)
 
     # Not a Python file
@@ -181,7 +188,7 @@ def main(config: str, model: str):
     files = sorted(files)
 
     # LLM that takes a string as input and returns a string
-    llm = utils.build_llm_client(model)
+    llm = utils.build_llm_completion_client(model)
 
     # File for storing LLM generated descriptions of files, functions, and
     # classes
@@ -198,7 +205,19 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
-        summarize_file(filepath, llm, descriptions)
+
+        # TODO - remove before merging
+        #if 'examples' in filepath:
+        #    continue
+        #if 'src/neosophia/agents' not in filepath:
+        #    continue
+        #if 'test_' in filepath:
+        #    continue
+        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
+        #    summarize_file(filepath, llm, descriptions)
+
+        #if i > 3:
+        #    break
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:
@@ -217,13 +236,17 @@ def main(config: str, model: str):
         config.Tools,
         tool_descriptions,
         collection,
-        llm)
+        llm,
+        config.repository
+    )
     utils.save_tools_to_yaml(tools, tools_filepath)
 
-    agent = Agent(config, collection, llm, tools)
+    # The agent LLM is a chat LLM that takes a list of messages as input and
+    # returns a message
+    agent_chat_llm = utils.build_llm_chat_client(model)
+    agent = Agent(config, collection, agent_chat_llm, tools)
     agent.run()
 
 
 if __name__ == '__main__':
     main()
-
