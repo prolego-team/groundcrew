@@ -48,6 +48,8 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
             data_type = 'class'
         elif name.endswith(' (function)'):
             data_type = 'function'
+        elif name.endswith(' (method)'):
+            data_type = 'method'
 
         filepath = name.split('::')[0]
 
@@ -205,6 +207,7 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
+        summarize_file(filepath, llm, descriptions)
 
         # TODO - remove before merging
         #if 'examples' in filepath:
@@ -213,9 +216,10 @@ def main(config: str, model: str):
         #    continue
         #if 'test_' in filepath:
         #    continue
+        #if 'tools.py' in filepath or 'util.py' in filepath:
+        #    summarize_file(filepath, llm, descriptions)
         #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
         #    summarize_file(filepath, llm, descriptions)
-
         #if i > 3:
         #    break
 
