@@ -4,6 +4,7 @@ Verify the database with different tests.
 
 from typing import Any, Dict, List, Optional, Tuple
 import os
+import pickle
 import sys
 
 import click
@@ -57,37 +58,48 @@ def main(config: str):
     }
 
     print('total ids:', len(docs))
+
+    # ~~~~ find empty documents
+
     empty_docs = []
     for uid, doc in docs.items():
-        print(uid)
         if not doc:
             print('empty document')
             empty_docs.append(uid)
+
     print('empty docs:', len(empty_docs))
     print('\t', empty_docs)
+    print()
 
-    # look for files that are missing from database
+    # ~~~~ find counts of documents by type
+
+    docs_by_type = {}
+    for uid, metadata in metadatas.items():
+        doc_type = metadata['type']
+        ids = docs_by_type.setdefault(doc_type, [])
+        ids.append(uid)
+
+    print('counts by type:')
+    for k, v in docs_by_type.items():
+        print('\t', k, len(v))
+    print()
+
+    # ~~~~ find files that are missing from database
+
     file_ids = set([
         x for x in docs
         if ':' not in x
     ])
 
-    # right now the file_ids are still full paths unfortunately
-    file_paths = [os.path.join(config.repository, x) for x in file_paths]
-
     print('db file ids:    ', len(file_ids))
     print('repo file paths:', len(file_paths))
     print('matches:', len(set(file_ids).intersection(set(file_paths))))
 
-    import pickle
-
-    # look at descriptions in cache and fix them!
+    # ~~~~ fix descriptions of in cache that don't use the relative path
 
     descriptions_file = os.path.join(config.cache_dir, 'descriptions.pkl')
     with open(descriptions_file, 'rb') as f:
         descriptions = pickle.load(f)
-
-    print(descriptions.keys())
 
     descriptions_fixed = {}
     fixed_count = 0
@@ -107,6 +119,7 @@ def main(config: str):
     if fixed_count > 0:
         with open(descriptions_file, 'wb') as f:
             pickle.dump(descriptions_fixed, f)
+        print(f'updated {descriptions_file}')
 
 
 if __name__ == '__main__':
