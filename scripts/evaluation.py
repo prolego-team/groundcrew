@@ -8,7 +8,6 @@ import os
 import re
 import time
 import sys
-from dataclasses import dataclass
 
 import chromadb
 import click
@@ -17,7 +16,6 @@ import tqdm
 import yaml
 
 from groundcrew.dataclasses import Config
-from groundcrew import code
 from groundcrew import constants
 from groundcrew import utils
 from groundcrew import tools

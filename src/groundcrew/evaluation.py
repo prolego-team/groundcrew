@@ -4,8 +4,7 @@ Tools for evaluation.
 
 from typing import Any, Callable
 from dataclasses import dataclass
-
-import chromadb
+import inspect
 
 
 @dataclass(frozen=True)
@@ -47,7 +46,6 @@ def parse_suite(eval_dict: dict[str, Any]) -> EvalSuite:
         ]
     )
 
-import inspect
 
 def verify_suite(suite: EvalSuite, system: System, eval_funcs: dict[str, Callable]) -> None:
     """perform checks on an eval suite"""
