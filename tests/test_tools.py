@@ -161,12 +161,12 @@ def test_singledocstringtool():
     assert out is False
 
     out = tool._id_matches_function(
-        id_='apples.py',
+        id_='bananas.py',
         function_name='foo')
     assert out is False
 
     out = tool._id_matches_function(
-        id_='apples.py',
+        id_='bananas.py',
         function_name='none')
     assert out is False
 
