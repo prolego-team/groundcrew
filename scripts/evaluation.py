@@ -89,8 +89,8 @@ def main(
 
     # OpenAI models can't be created with a seed
     # so this is a simple wrapper that ignores the seed
-    llm_from_seed = lambda _: utils.build_llm_client(model)
-    llm = utils.build_llm_client(model)
+    llm_from_seed = lambda _: utils.build_llm_completion_client(model)
+    llm = utils.build_llm_completion_client(model)
 
     tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
     tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
@@ -130,6 +130,8 @@ def main(
 
     eval_funcs_dict = dict(
         match_word_any=match_word_any,
+        contains_all=contains_all,
+        always_pass=always_pass,
         eval_with_llm=build_eval_with_llm(llm)
     )
 
@@ -269,6 +271,24 @@ def match_word_any(text: str, words: List[str], strip_quotes: bool) -> bool:
         if word in text_words:
             return True
     return False
+
+
+def contains_all(text: str, checks: List[str]) -> bool:
+    """
+    Check if text contains ALL checks.
+    """
+
+    for check in checks:
+        if check not in text:
+            return False
+    return True
+
+
+def always_pass(text: str) -> bool:
+    """
+    Always pass.
+    """
+    return True
 
 
 def build_eval_with_llm(llm: Callable) -> Callable:

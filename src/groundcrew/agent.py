@@ -92,6 +92,10 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
+
+            if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
+                break
+
             self.messages.append(UserMessage(user_prompt))
 
             spinner = yaspin(text='Thinking...', color='green')
