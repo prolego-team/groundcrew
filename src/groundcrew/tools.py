@@ -189,9 +189,9 @@ class SingleDocstringTool:
     def __call__(
             self,
             user_prompt: str,
-            code: str = 'none',
-            filename: str = 'none',
-            function_name: str = 'none') -> str:
+            code: str,
+            filename: str,
+            function_name: str) -> str:
         """
         Generate docstrings for a given snippet of code, a function, or all
         functions in a given file.
@@ -222,7 +222,7 @@ class SingleDocstringTool:
         all_ids = self.collection.get()['ids']
 
         # Determine the context based on input parameters
-        context = self._determine_context(filename, function_name, code)
+        context = self._determine_context(code, filename, function_name)
 
         if context == 'no_match':
             return 'No matching functions found.'
@@ -235,11 +235,13 @@ class SingleDocstringTool:
         return self.llm(prompt)
 
     def _determine_context(
-            self, filename: str, function_name: str, code: str) -> str:
+            self, code: str, filename: str, function_name: str) -> str:
         if code != 'none':
             return 'code'
         if filename == 'none' and function_name != 'none':
             return 'function'
+        if filename != 'none' and function_name != 'none':
+            return 'file-function'
         if filename != 'none':
             return 'file'
         return 'no_match'
@@ -270,6 +272,11 @@ class SingleDocstringTool:
                     id_, function_name):
                 filtered_ids.append(id_)
 
+            # Adding a specific function in a specific file
+            elif context == 'file-function' and self._id_matches_file(
+                    id_, filename, function_name):
+                filtered_ids.append(id_)
+
         for id_ in filtered_ids:
             item = self.collection.get(id_)
             function_code.append(item['metadatas'][0]['text'] + '\n')
@@ -291,7 +298,7 @@ class SingleDocstringTool:
             If function_name is 'none', then this will add all functions in the
             matched file
         """
-        if '::' in id_ and get_filename_from_id(id_) == filename:
+        if get_filename_from_id(id_) == filename:
             return True if function_name == 'none' or f'::{function_name}' in id_ else False
         return False
 
