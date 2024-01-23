@@ -113,8 +113,6 @@ class Agent:
 
             self.interact(user_prompt)
 
-            # TODO - handle params that should be there but are not
-
     def run_with_prompts(self, prompts: list[str]):
         """
         Process a list of user prompts and respond using the chosen tool
@@ -190,6 +188,14 @@ class Agent:
                 if param_name in expected_tool_args:
                     new_args[param_name] = val
             tool_args = new_args
+
+            # Add any missing parameters - default to None for now.
+            # In the future we'll probably want the LLM to regenerate params
+            for param_name in expected_tool_args.keys():
+                if param_name == 'user_prompt':
+                    continue
+                if param_name not in tool_args:
+                    tool_args[param_name] = None
 
             if self.config.debug:
                 print(f'Please standby while I run the tool {tool.name}...')
