@@ -79,6 +79,7 @@ def populate_db(descriptions: dict[str, str], collection: Collection):
 
 def summarize_file(
         filepath: str,
+        repo_dir_path: str,
         llm: Callable,
         descriptions: dict):
     """
@@ -91,7 +92,8 @@ def summarize_file(
     code_dict = {}
 
     # Get the file text
-    with open(filepath, 'r') as f:
+    #with open(filepath, 'r') as f:
+    with open(opj(repo_dir_path, filepath), 'r') as f:
         file_text = ''.join(f.readlines())
 
     # If it's a Python file also extract classes and functions
@@ -207,8 +209,8 @@ def main(config: str, model: str, prompts_file: str):
 
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
-        filepath = opj(config.repository, filepath)
-        #summarize_file(filepath, llm, descriptions)
+        #filepath = opj(config.repository, filepath)
+        summarize_file(filepath, config.repository, llm, descriptions)
 
         # TODO - remove before merging
         #if 'examples' in filepath:
@@ -219,8 +221,8 @@ def main(config: str, model: str, prompts_file: str):
         #    continue
         #if 'tools.py' in filepath or 'util.py' in filepath:
         #    summarize_file(filepath, llm, descriptions)
-        if 'agents/agent.py' in filepath:
-            summarize_file(filepath, llm, descriptions)
+        #if 'agents/agent.py' in filepath:
+        #    summarize_file(filepath, llm, descriptions)
         #if i > 3:
         #    break
 
