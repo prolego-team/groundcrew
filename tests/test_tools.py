@@ -41,7 +41,7 @@ def test_complexity_tool():
     # in memory client for testing
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(
-        name=constants.DEFAULT_COLLECTION_NAME
+        name='test'
     )
 
     code = (
@@ -64,14 +64,28 @@ def test_complexity_tool():
         'foo.py',
         'foo.py::test_func (function)',
         'foo.py::TestClass (class)',
-        'foo.py::TestClass.test_method (method)'
+        'foo.py::TestClass.test_method (method)',
+        'bar.py',
+        'bar.py::test_func (function)',
+        'README.md'
     ]
-    source_code = ['\n'.join(code), '\n'.join(code[0:4]), '\n'.join(code[6:]), '\n'.join(code[7:])]
+    source_code = [
+        '\n'.join(code),
+        '\n'.join(code[0:5]),
+        '\n'.join(code[6:]),
+        '\n'.join(code[7:]),
+        '\n'.join(code[0:6]),
+        '\n'.join(code[0:5]),
+        'read me'
+    ]
     metadatas = [
         {'type': 'file', 'id': 'foo.py', 'filepath': 'foo.py', 'text': source_code[0]},
         {'type': 'function', 'id': 'foo.py::test_func', 'filepath': 'foo.py', 'text': source_code[1]},
         {'type': 'class', 'id': 'foo.py::TestClass', 'filepath': 'foo.py', 'text': source_code[2]},
-        {'type': 'method', 'id': 'foo.py::TestClass.test_method', 'filepath': 'foo.py', 'text': source_code[3]}
+        {'type': 'method', 'id': 'foo.py::TestClass.test_method', 'filepath': 'foo.py', 'text': source_code[3]},
+        {'type': 'file', 'id': 'bar.py', 'filepath': 'bar.py', 'text': source_code[4]},
+        {'type': 'function', 'id': 'bar.py::test_func', 'filepath': 'bar.py', 'text': source_code[5]},
+        {'type': 'file', 'id': 'README.md', 'filepath': 'README.md', 'text': source_code[6]},
     ]
 
     collection.upsert(
@@ -83,20 +97,35 @@ def test_complexity_tool():
     # do nothing
     llm_mock = lambda x: x
 
-    tool = tools.CyclomaticComplexity('You are a tool.', collection, llm_mock)
-
-    # test fuzzy matching
-    assert tool.fuzzy_match_file_path('bapples', 50) == 'src/apples.py'    # close
-    assert tool.fuzzy_match_file_path('oranges', 50) == 'src/oranges.py'   # exact
-    assert tool.fuzzy_match_file_path('baloney', 50) == 'src/bananas.py'   # far
-    assert tool.fuzzy_match_file_path('baloney', 75) is None
-
-    # test getting filepaths from collection
-    assert tool.get_paths() == {
-        '0': 'src/apples.py',
-        '1': 'src/bananas.py',
-        '2': 'src/oranges.py'
+    tool = tools.CyclomaticComplexityTool('You are a tool.', collection, llm_mock)
+    assert set(tool.get_files().keys()) == {'foo.py', 'bar.py'}
+    assert tool.get_complexity(source_code[0]) == {
+        'average': 3.0,
+        'max': 4,
+        'details': {
+            'TestClass': {
+                'complexity': 4,
+                'methods': {'test_method': {'complexity': 3}},
+                'object': 'class'
+            },
+            'test_func': {'complexity': 2, 'object': 'function'}
+        }
     }
+    output = tool.complexity_analysis('max')
+    target_output = [
+        'Cyclomatic complexity summary for the most complex files:',
+        'File: foo.py; average complexity = 3.0; max complexity = 4',
+        '  test_func: 2',
+        '  TestClass: 4',
+        '    TestClass.test_method: 3',
+        'File: bar.py; average complexity = 2.0; max complexity = 2',
+        '  test_func: 2',
+        ''
+    ]
+    assert output.split('\n') == target_output
+
+    output = tool.complexity_analysis('average')
+    assert output.split('\n') == target_output
 
 
 def test_lintfiletool():

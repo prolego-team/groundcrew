@@ -240,8 +240,6 @@ def main(config: str, model: str):
         for x, y in zip(all_entries['ids'], all_entries['metadatas'])
         if 'method' in x
     }
-    print(x)
-    print()
 
     # Load or generate Tools
     tools_filepath = opj(config.cache_dir, 'tools.yaml')

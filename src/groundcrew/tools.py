@@ -315,60 +315,39 @@ class CodebaseQATool:
         return self.llm(prompt)
 
 
-class CyclomaticComplexity:
+class CyclomaticComplexityTool:
     """
     Tool for computing the cyclomatic complexity of a codebase.
     """
-    # start with a single component
-    # filter collections, compute complexity
     def __init__(
             self,
             base_prompt: str,
             collection: Collection,
             llm: Callable,
-            min_complexity: int = 11
+            min_max_complexity: int = 11
         ):
         self.collection = collection
         self.llm = llm
         self.base_prompt = base_prompt
-        self.min_complexity = min_complexity
+        self.min_max_complexity = min_max_complexity
 
-    def __call__(self, user_prompt: str) -> str:
-        """The call method"""
-        files = self.get_files()
+    def __call__(self, user_prompt: str, sort_on: str) -> str:
+        """Answer questions using about the complex parts of a codebase.
+        This method will create a summary of the most complex files to help answer
+        the question."""
 
-        file_complexity = {}
-        for file, source_code in files.items():
-            complexity_dict = cyclomatic_complexity(source_code)
-            total_complexity = sum(complexity_dict[obj]['complexity'] for obj in complexity_dict)
-            max_complexity = max(complexity_dict[obj]['complexity'] for obj in complexity_dict)
-            if total_complexity > self.min_complexity:
-                file_complexity[file] = {
-                    'total': total_complexity,
-                    'max': max_complexity,
-                    'details': complexity_dict
-                }
+        sort_on = sort_on.lower()
+        assert sort_on in ['average', 'max'], 'sort_on must be "average" or "max"'
 
-        sorted_complexity = sorted(file_complexity.items(), key=lambda x: x[1]['total'], reverse=True)
+        complexity_summary_str = self.complexity_analysis(sort_on)
 
-        summary_str = ''
-        for file, complexity in sorted_complexity:
-            summary_str += (
-                f'File: {file}; '
-                f'total complexity = {file_complexity[file]["total"]}; '
-                f'max complexity = {file_complexity[file]["max"]}\n'
-            )
-            for name, desc in file_complexity[file]['details'].items():
-                if desc['object'] == 'function':
-                    summary_str += f'  {name}: {desc["complexity"]}\n'
-                elif desc['object'] == 'class':
-                    summary_str += f'  {name}: {desc["complexity"]}\n'
-                    for method, method_desc in desc['methods'].items():
-                        summary_str += f'    {name}.{method}: {method_desc["complexity"]}'
+        prompt = (
+            complexity_summary_str +
+            '\n### Task ###\n' + self.base_prompt +
+            '\n### Question ###\n' + user_prompt + '\n'
+        )
 
-
-        return summary_str
-
+        return self.llm(prompt)
 
     def get_files(self):
         """Get items from the collection"""
@@ -380,19 +359,73 @@ class CyclomaticComplexity:
         return {
             id_: metadata['text']
             for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
+            if id_[-3:] == '.py'
         }
 
-    def get_objects_in_file(self, file_id: str):
-        """Get items from the collection"""
-        all_items = self.collection.get(
-            include=['metadatas'],
-            where={'filepath': {'$contains': file_id}}
-        )
+    def get_complexity(self, source_code: str) -> dict[str, dict]:
+        """Get the complexity of source code."""
+
+        complexity_dict = cyclomatic_complexity(source_code)
+        if len(complexity_dict) == 0:
+            average_complexity, max_complexity = 0, 0
+        else:
+            average_complexity = sum(complexity_dict[obj]['complexity'] for obj in complexity_dict)/len(complexity_dict)
+            max_complexity = max(complexity_dict[obj]['complexity'] for obj in complexity_dict)
 
         return {
-            id_: metadata['text']
-            for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
+            'average': average_complexity,
+            'max': max_complexity,
+            'details': complexity_dict
         }
 
+    def complexity_analysis(self, sort_on: str) -> tuple[list[str], dict]:
+        """Analyze the complexity of the codebase."""
+        files = self.get_files()
 
+        file_complexity = {}
+        current_max = 0
+        for file, source_code in files.items():
+            complexity = self.get_complexity(source_code)
+            if complexity['max'] >= self.min_max_complexity or complexity['max'] > current_max:
+                file_complexity[file] = complexity
+                current_max = max(current_max, complexity['max'])
 
+        sorted_complexity = sorted(file_complexity.items(), key=lambda x: x[1][sort_on], reverse=True)
+
+        prune = (
+            sorted_complexity[0][1]['max'] >= self.min_max_complexity and
+            sorted_complexity[-1][1]['max'] < self.min_max_complexity
+        )
+        if prune:
+            sorted_filenames = [
+                item[0] for item in sorted_complexity
+                if item[1]['max'] >= self.min_max_complexity
+            ]
+        else:
+            sorted_filenames = [item[0] for item in sorted_complexity]
+
+        return self.summarize(file_complexity, sorted_filenames)
+
+    def summarize(self, file_complexity: dict, file_list: list[str]) -> str:
+        """Summarize the complexity of a list of files.
+
+        The file_complexity dict should be keyed by file name and have values that were
+        generated by the get_complexity method.  file_list should be a _sorted_ list of
+        file names that index decreasing complexity."""
+
+        summary_str = 'Cyclomatic complexity summary for the most complex files:\n'
+        for file in file_list:
+            summary_str += (
+                f'File: {file}; '
+                f'average complexity = {file_complexity[file]["average"]}; '
+                f'max complexity = {file_complexity[file]["max"]}\n'
+            )
+            for name, desc in file_complexity[file]['details'].items():
+                if desc['object'] == 'function':
+                    summary_str += f'  {name}: {desc["complexity"]}\n'
+                elif desc['object'] == 'class':
+                    summary_str += f'  {name}: {desc["complexity"]}\n'
+                    for method, method_desc in desc['methods'].items():
+                        summary_str += f'    {name}.{method}: {method_desc["complexity"]}\n'
+
+        return summary_str
