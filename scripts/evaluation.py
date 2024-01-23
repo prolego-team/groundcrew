@@ -290,11 +290,12 @@ def load_system_from_config(
     tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
     tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
 
+    def agent_wrapper():
+        pass
+
     # This is actually a dictionary of tool constructors, adapted
     # to take an LLM. This is because during testing need the ability
     # to construct a new LLM with a different seed for each iteration.
-
-    # TODO: agent "tool" for testing the whole system
 
     tools_dict = {
         'CodebaseQATool': lambda x: tools.CodebaseQATool(
@@ -312,7 +313,8 @@ def load_system_from_config(
             collection=collection,
             llm=x,
             working_dir_path=config.repository
-        )
+        ),
+        'Agent': agent_wrapper
     }
 
     return ev.System(
