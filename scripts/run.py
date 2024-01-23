@@ -92,7 +92,6 @@ def summarize_file(
     code_dict = {}
 
     # Get the file text
-    #with open(filepath, 'r') as f:
     with open(opj(repo_dir_path, filepath), 'r') as f:
         file_text = ''.join(f.readlines())
 
