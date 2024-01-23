@@ -1,17 +1,14 @@
 """
 Evaluation framework.
-
-Current focus is on testing individual tools.
 """
-
-# Copyright (c) 2023 Prolego Inc. All rights reserved.
-# Ben Zimmer
 
 from typing import Dict, List, Callable
 import datetime
 import os
 import re
 import time
+import sys
+from dataclasses import dataclass
 
 import chromadb
 import click
@@ -24,6 +21,7 @@ from groundcrew import code
 from groundcrew import constants
 from groundcrew import utils
 from groundcrew import tools
+from groundcrew import evaluation as ev
 
 # TODO: find a better place for this
 #       Maybe in the eval config?
@@ -50,107 +48,46 @@ def main(
     output_dir_path = f'{output_dir_prefix}_{timestamp}'
     os.makedirs(output_dir_path, exist_ok=False)
 
-    # ~~~~ load config ~~~~
+    # ~~~~ load a single system (for now) that we will evaluate
 
-    # TODO: maybe this should be specified in an eval config
-
-    with open(config, 'r') as f:
-        config = yaml.safe_load(f)
-    config = Config(**config)
-
-    # ~~~~ check the code version of the repo we are going to test
-
-    repo = git.Repo(config.repository)
-    assert repo.head.commit.hexsha == REPO_COMMIT_HASH
-
-    # ~~~~ build the system (collection, llm, etc)
-
-    # For now we'll assume that `run.py` has been run
-    # and the database is present
-
-    with open(evals, 'r') as f:
-        evals = yaml.safe_load(f)
-
-    # Directory to store generated file and function descriptions
-    os.makedirs(config.cache_dir, exist_ok=True)
-
-    # Create the chromadb client
-    client = chromadb.PersistentClient(config.db_path)
-
-    collection = client.get_or_create_collection(
-        name=constants.DEFAULT_COLLECTION_NAME,
-        embedding_function=constants.DEFAULT_EF
+    system_default = load_system_from_config(
+        config_file_path=config,
+        llm_model_name=model,
+        hash_check=REPO_COMMIT_HASH
     )
 
-    # res = collection.get()
-    # print(len(res['metadatas']))
-    # print(res['ids'])
-    #exit()
+    # ~~~~ load the evaluation suites that we will run
 
-    # OpenAI models can't be created with a seed
-    # so this is a simple wrapper that ignores the seed
-    llm_from_seed = lambda _: utils.build_llm_completion_client(model)
+    evals = load_evals(evals)
+
+    # ~~~~ build a set of evaluation functions
+
     llm = utils.build_llm_completion_client(model)
 
-    tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
-    tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
-
-    # This is actually a dictionary of tool constructors, adapted
-    # to take a Collection and LLM.
-
-    # The tuple of Collection and LLM (more or less) defines the
-    # "system" that we are trying to test, since the most obvious
-    # way we could get different behavior from the system is with
-    # different summaries / embeddings / embedding method (Collection)
-    # and different LLM for generative capabilites.
-
-    # Tool base_prompts are passed in here for now but we could make
-    # those part of the system later.
-
-    tools_dict = {
-        'CodebaseQATool': lambda c, l: tools.CodebaseQATool(
-            base_prompt=tool_descs['CodebaseQATool']['base_prompt'],
-            collection=c,
-            llm=l
-        ),
-        'SingleDocstringTool': lambda c, l: tools.SingleDocstringTool(
-            base_prompt=tool_descs['SingleDocstringTool']['base_prompt'],
-            collection=c,
-            llm=l
-        ),
-        'LintFileTool': lambda c, l: tools.LintFileTool(
-            base_prompt=tool_descs['LintFileTool']['base_prompt'],
-            collection=c,
-            llm=l,
-            working_dir_path=config.repository
-        )
-    }
-
-    # build a set of evaluation functions
-
-    eval_funcs_dict = dict(
+    eval_funcs = dict(
         match_word_any=match_word_any,
         contains_all=contains_all,
         always_pass=always_pass,
         eval_with_llm=build_eval_with_llm(llm)
     )
 
+    # ~~~~ run some checks before starting to make sure our evals are valid
+
+    for suite in evals:
+        ev.verify_suite(suite, system_default, eval_funcs)
+
     # ~~~~ run evaluations
 
-    # For now, we are only testing on one "system"
-    # (one combination of Collection / LLM)
+    # for now, we are only testing on one "system"
 
     results = {}
 
     for suite in evals:
         results_suite = run_suite(
+            system=system_default,
             suite=suite,
             n_runs=n_runs,
-            eval_funcs_dict=eval_funcs_dict,
-            tools_dict=tools_dict,
-
-            collection=collection,
-            llm_from_seed=llm_from_seed,
+            eval_funcs=eval_funcs,
         )
         results = {**results, **results_suite}
 
@@ -188,39 +125,33 @@ def main(
 
 
 def run_suite(
-        suite: Dict,
+        system: ev.System,
+        suite: ev.EvalSuite,
         n_runs: int,
-        eval_funcs_dict: Dict,
-        tools_dict: Dict,
-
-        collection: chromadb.Collection,
-        llm_from_seed: Callable,
+        eval_funcs: Dict
         ) -> Dict:
-    """run a test suite and return results"""
+    """Run a test suite on a system and return results"""
 
     results = {}
 
-    suite_name = suite['name']
-
-    print(suite_name)
+    print(suite.name)
 
     success = []
 
-    for test in tqdm.tqdm(suite['tests']):
+    for test in tqdm.tqdm(suite.tests):
         for run_idx in range(n_runs):
-            test_name = test['name']
-            build_tool = tools_dict[test['tool']]
-            tool_params = test['params']
-            eval_params = dict(test['eval_func'])
-            eval_func = eval_funcs_dict[eval_params['typ']]
+            build_tool = system.tools[test.tool]
+            tool_params = test.params
+            eval_params = dict(test.eval_func)
+            eval_func = eval_funcs[eval_params['typ']]
             del eval_params['typ']
 
-            llm = llm_from_seed(run_idx)
+            llm = system.llm_from_seed(run_idx)
 
             start_time = time.time()
 
             try:
-                tool = build_tool(collection, llm)
+                tool = build_tool(llm)
                 answer = tool(**tool_params)
             except Exception as e:
                 print('exception while running tool:', e)
@@ -246,7 +177,7 @@ def run_suite(
                 info['correct'] = False
                 success.append(False)
 
-            uid = (suite_name, test_name, run_idx)
+            uid = (suite.name, test.name, run_idx)
             results[uid] = info
 
     print(sum(success), '/', len(success), 'passed')
@@ -315,6 +246,97 @@ def build_eval_with_llm(llm: Callable) -> Callable:
         return False
 
     return eval_with_llm
+
+
+def load_system_from_config(
+        config_file_path: str,
+        llm_model_name: str,
+        hash_check: str
+        ) -> ev.System:
+    """
+    Default system loading behavior, contstructs a system from the same config
+    file used by run
+    """
+
+    # ~~~~ load config ~~~~
+
+    with open(config_file_path, 'r') as f:
+        config = yaml.safe_load(f)
+    config = Config(**config)
+
+    # ~~~~ check the code version of the repo we are going to test
+
+    repo = git.Repo(config.repository)
+    assert repo.head.commit.hexsha == hash_check
+
+    # ~~~~ build the system (collection, llm, etc)
+
+    # For now we'll assume that `run.py` has been run
+    # and the database is present
+
+    # Directory to store generated file and function descriptions
+    os.makedirs(config.cache_dir, exist_ok=True)
+
+    # Create the chromadb client
+    client = chromadb.PersistentClient(config.db_path)
+
+    collection = client.get_or_create_collection(
+        name=constants.DEFAULT_COLLECTION_NAME,
+        embedding_function=constants.DEFAULT_EF
+    )
+
+    # OpenAI models can't be created with a seed
+    # so this is a simple wrapper that ignores the seed
+    llm_from_seed = lambda _: utils.build_llm_completion_client(llm_model_name)
+
+    tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
+    tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
+
+    # This is actually a dictionary of tool constructors, adapted
+    # to take an LLM. This is because during testing need the ability
+    # to construct a new LLM with a different seed for each iteration.
+
+    # TODO: agent "tool" for testing the whole system
+
+    tools_dict = {
+        'CodebaseQATool': lambda x: tools.CodebaseQATool(
+            base_prompt=tool_descs['CodebaseQATool']['base_prompt'],
+            collection=collection,
+            llm=x
+        ),
+        'SingleDocstringTool': lambda x: tools.SingleDocstringTool(
+            base_prompt=tool_descs['SingleDocstringTool']['base_prompt'],
+            collection=collection,
+            llm=x
+        ),
+        'LintFileTool': lambda x: tools.LintFileTool(
+            base_prompt=tool_descs['LintFileTool']['base_prompt'],
+            collection=collection,
+            llm=x,
+            working_dir_path=config.repository
+        )
+    }
+
+    return ev.System(
+        tools=tools_dict,
+        llm_from_seed=llm_from_seed
+    )
+
+
+def load_evals(evals_file_path: str) -> list[ev.EvalSuite]:
+    """Load a list of evaluation suites to run"""
+
+    with open(evals_file_path, 'r') as f:
+        evals = yaml.safe_load(f)
+
+    try:
+        evals = [ev.parse_suite(x) for x in evals]
+    except Exception as e:
+        print('Error parsing evaluation suits:')
+        print(e)
+        sys.exit()
+
+    return evals
 
 
 if __name__ == '__main__':
