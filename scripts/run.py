@@ -209,7 +209,6 @@ def main(config: str, model: str, prompts_file: str):
 
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
-        #filepath = opj(config.repository, filepath)
         summarize_file(filepath, config.repository, llm, descriptions)
 
         # TODO - remove before merging
