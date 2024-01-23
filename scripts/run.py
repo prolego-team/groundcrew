@@ -207,17 +207,19 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
+        summarize_file(filepath, llm, descriptions)
 
         # TODO - remove before merging
-        if 'examples' in filepath:
-           continue
-        if 'src/neosophia/agents' not in filepath:
-           continue
-        if 'test_' in filepath:
-           continue
-        if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
-           summarize_file(filepath, llm, descriptions)
-
+        #if 'examples' in filepath:
+        #    continue
+        #if 'src/neosophia/agents' not in filepath:
+        #    continue
+        #if 'test_' in filepath:
+        #    continue
+        #if 'tools.py' in filepath or 'util.py' in filepath:
+        #    summarize_file(filepath, llm, descriptions)
+        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
+        #    summarize_file(filepath, llm, descriptions)
         #if i > 3:
         #    break
 
