@@ -18,6 +18,7 @@ class System:
     # collection: chromadb.Collection
     tools: dict[str, Callable]
     llm_from_seed: Callable
+    chat_llm_from_seed: Callable
 
 
 @dataclass(frozen=True)
@@ -53,12 +54,23 @@ def verify_suite(suite: EvalSuite, system: System, eval_funcs: dict[str, Callabl
         uid = f'`{suite.name}`:`{test.name}`'
         assert test.tool in system.tools, f'{uid}: tool from suite not in system'
 
-        assert 'typ' in test.eval_func, f'{uid}: eval_func missing type'
-        ef_typ = test.eval_func['typ']
+        # instantiate the tool to check params
+        if test.tool == 'Agent':
+            tool = system.tools[test.tool](None, None)
+        else:
+            tool = system.tools[test.tool](None)
+
+        actual_params = inspect.signature(tool).parameters
+        compare_params = set(test.params.keys()) == set(actual_params.keys())
+
+        assert compare_params, f'{uid}: tool parameter mismatch'
+
+        assert 'type' in test.eval_func, f'{uid}: eval_func missing type'
+        ef_typ = test.eval_func['type']
         assert ef_typ in eval_funcs, f'{uid}: eval_func type `{ef_typ}` not in eval_funcs'
 
         params = dict(test.eval_func)
-        del params['typ']
+        del params['type']
         params['text'] = None
 
         actual_params = inspect.signature(eval_funcs[ef_typ]).parameters

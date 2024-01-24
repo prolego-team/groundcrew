@@ -11,7 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage, Message
 
 
 class Agent:
@@ -44,7 +44,7 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages = [SystemMessage(sp.AGENT_PROMPT)]
+        self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -107,6 +107,23 @@ class Agent:
             # TODO - handle params that should be there but are not
 
             self.print(response, 'agent')
+
+    def interact_functional(self, user_prompt: str) -> str:
+        """
+        Process a user prompt and call dispatch
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            the system's response
+        """
+        self.messages.append(UserMessage(user_prompt))
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
+        response = self.dispatch(user_prompt)
+        self.messages.append(AssistantMessage(response))
+        spinner.stop()
+        self.print(response, 'agent')
+        return response
 
     def dispatch(self, user_prompt: str) -> str:
         """

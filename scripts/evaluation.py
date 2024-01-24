@@ -16,10 +16,11 @@ import tqdm
 import yaml
 
 from groundcrew.dataclasses import Config
+from groundcrew import agent
 from groundcrew import constants
+from groundcrew import evaluation as ev
 from groundcrew import utils
 from groundcrew import tools
-from groundcrew import evaluation as ev
 
 # TODO: find a better place for this
 #       Maybe in the eval config?
@@ -141,15 +142,20 @@ def run_suite(
             build_tool = system.tools[test.tool]
             tool_params = test.params
             eval_params = dict(test.eval_func)
-            eval_func = eval_funcs[eval_params['typ']]
-            del eval_params['typ']
-
-            llm = system.llm_from_seed(run_idx)
-
-            start_time = time.time()
+            eval_func = eval_funcs[eval_params['type']]
+            del eval_params['type']
 
             try:
-                tool = build_tool(llm)
+                # special case for testing the Agent which also needs a chat LLM
+                llm = system.llm_from_seed(run_idx)
+                if test.tool == 'Agent':
+                    chat_llm = system.chat_llm_from_seed(run_idx)
+                    tool = build_tool(llm, chat_llm)
+                else:
+                    tool = build_tool(llm)
+
+                start_time = time.time()
+
                 answer = tool(**tool_params)
             except Exception as e:
                 print('exception while running tool:', e)
@@ -286,12 +292,39 @@ def load_system_from_config(
     # OpenAI models can't be created with a seed
     # so this is a simple wrapper that ignores the seed
     llm_from_seed = lambda _: utils.build_llm_completion_client(llm_model_name)
+    chat_llm_from_seed = lambda _: utils.build_llm_chat_client(llm_model_name)
 
     tools_filepath = os.path.join(config.cache_dir, 'tools.yaml')
     tool_descs = utils.setup_and_load_yaml(tools_filepath, 'tools')
 
-    def agent_wrapper():
-        pass
+    def agent_wrapper(llm: Callable, chat_llm: Callable) -> Callable:
+        """
+        Given a chat llm, build a function that can interact
+        with an agent.
+        """
+
+        # TODO: this is not ideal. eventually I want to rewrite / refactor `setup_tools`
+        #       to avoid evaluation potentially updating the cache
+        tools_for_agent = utils.setup_tools(
+            modules_list=config.Tools,
+            tool_descriptions=tool_descs,
+            collection=collection,
+            llm=llm,
+            working_dir_path=config.repository
+        )
+
+        def run_agent(user_prompts: List[str]) -> str:
+            """run the agent"""
+            agent_obj = agent.Agent(config, collection, chat_llm, tools_for_agent)
+            res = ''
+            for prompt in user_prompts:
+                print('>>>> INPUT:', prompt)
+                res = agent_obj.interact_functional(prompt)
+                print('>>>> OUTPUT:', res)
+            print('>>>> run_agent DONE')
+
+            return res
+        return run_agent
 
     # This is actually a dictionary of tool constructors, adapted
     # to take an LLM. This is because during testing need the ability
@@ -319,7 +352,8 @@ def load_system_from_config(
 
     return ev.System(
         tools=tools_dict,
-        llm_from_seed=llm_from_seed
+        llm_from_seed=llm_from_seed,
+        chat_llm_from_seed=chat_llm_from_seed
     )
 
 

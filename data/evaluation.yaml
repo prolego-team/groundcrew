@@ -1,4 +1,4 @@
-- name: Codebase QA
+- name: Tools
   tests:
     - name: find func A
       tool: CodebaseQATool
@@ -6,7 +6,7 @@
         user_prompt: Is there functionality to extract text from a pdf?
         include_code: false
       eval_func:
-        typ: match_word_any
+        type: match_word_any
         words: ['extract_text_from_pdf']
         strip_quotes: true
     - name: find func B
@@ -15,7 +15,7 @@
         user_prompt: How do I first find the paths for PDFs?
         include_code: true
       eval_func:
-        typ: match_word_any
+        type: match_word_any
         words: ['find_pdfs_in_directory']
         strip_quotes: true
 
@@ -25,7 +25,7 @@
         user_prompt: What are some linting issues with agents utils?
         filepath_inexact: agents utils
       eval_func:
-        typ: contains_all
+        type: contains_all
         checks: ['unused import', 'dataclasses.asdict', 'bare', 'except']
     - name: lint B
       tool: LintFileTool
@@ -33,7 +33,7 @@
         user_prompt: What are some code style issues with tests_tree.py?
         filepath_inexact: tests_tree.py
       eval_func:
-        typ: contains_all
+        type: contains_all
         checks: ['is None', 'lambda']
     - name: lint C
       tool: LintFileTool
@@ -41,8 +41,8 @@
         user_prompt: What are some import issues in tools.py
         filepath_inexact: tools.py
       eval_func:
-        typ: contains_all
-        checks: ['unused', 'json', 'sqlite3', 'typing.Any', 'typing.List', 'pandasql']
+        type: contains_all
+        checks: ['unused', 'json', 'sqlite3', 'typeing.Any', 'typeing.List', 'pandasql']
 
     - name: docstring A
       tool: SingleDocstringTool
@@ -51,8 +51,22 @@
         filename: none
         function_name: check_prompt
       eval_func:
-        typ: always_pass
+        type: always_pass
 
+
+- name: Agent
+  tests:
+    # Note that this doesn't currently pass, the final prompt results in a 'No matching functions found' message.
+    - name: find / interact / docstring
+      tool: Agent
+      params:
+        user_prompts:
+          - Show the full code for the function that calculates running cost.
+          - Refactor it to return a list, and rename it accordingly.
+          - Generate a docstring for the refactored function.
+      eval_func:
+        type: contains_all
+        checks: ['"""', 'List', 'Returns']
 
 #- name: Codebase QA Fuzzy
 #  tests:
@@ -62,7 +76,7 @@
 #        user_prompt: Is there functionality to extract text from a pdf?
 #        include_code: false
 #      eval_func:
-#        typ: eval_with_llm
+#        type: eval_with_llm
 #        instructions: The result should reference the function "extract_text_from_pdf"
 #
 #    - name: find func B
@@ -71,5 +85,5 @@
 #        user_prompt: How do I first find the paths for PDFs?
 #        include_code: true
 #      eval_func:
-#        typ: eval_with_llm
+#        type: eval_with_llm
 #        instructions: The result should reference the function "find_pdfs_in_directory"
