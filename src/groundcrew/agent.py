@@ -135,6 +135,46 @@ class Agent:
 
         self.run()
 
+    def run_tool(self, dispatch_prompt, parsed_response, previous_steps):
+
+        previous_steps = '\n\n'.join(previous_steps)
+
+        tool_selection = parsed_response['Tool']
+        if tool_selection not in self.tools:
+            return 'The LLM tried to call a function that does not exist.'
+
+        tool = self.tools[tool_selection]
+        tool_args = self.extract_params(parsed_response)
+
+        expected_tool_args = inspect.signature(tool.obj).parameters
+
+        # Filter out incorrect parameters
+        new_args = {}
+        for param_name, val in tool_args.items():
+            if param_name in expected_tool_args:
+                new_args[param_name] = val
+        tool_args = new_args
+
+        # Add any missing parameters - default to None for now.
+        # In the future we'll probably want the LLM to regenerate params
+        for param_name in expected_tool_args.keys():
+            if param_name == 'user_prompt':
+                continue
+            if param_name not in tool_args:
+                tool_args[param_name] = None
+
+        if self.config.debug:
+            print(f'Please standby while I run the tool {tool.name}...')
+            print(f'("{parsed_response["Tool query"]}", {tool_args})')
+            print()
+
+        response = utils.highlight_code(
+            tool.obj(parsed_response['Tool query'], **tool_args),
+            self.config.colorscheme
+        )
+
+        return response
+
     def dispatch(self, user_prompt: str) -> str:
         """
         Analyze the user's input and and either respond or choose an appropriate
@@ -151,6 +191,10 @@ class Agent:
         dispatch_prompt = '### Tools ###\n'
         for tool in self.tools.values():
             dispatch_prompt += tool.to_yaml() + '\n\n'
+
+        previous_steps_prompt = '### Previous Steps ###\n'
+
+        dispatch_prompt += previous_steps_prompt
 
         dispatch_prompt += '### Question ###\n'
         dispatch_prompt += user_prompt + '\n\n'
@@ -172,45 +216,21 @@ class Agent:
             keywords=['Response', 'Reason', 'Tool', 'Tool query']
         )
 
-        if 'Tool' in parsed_response:
-            tool_selection = parsed_response['Tool']
-            if tool_selection not in self.tools:
-                return 'The LLM tried to call a function that does not exist.'
-
-            tool = self.tools[tool_selection]
-            tool_args = self.extract_params(parsed_response)
-
-            expected_tool_args = inspect.signature(tool.obj).parameters
-
-            # Filter out incorrect parameters
-            new_args = {}
-            for param_name, val in tool_args.items():
-                if param_name in expected_tool_args:
-                    new_args[param_name] = val
-            tool_args = new_args
-
-            # Add any missing parameters - default to None for now.
-            # In the future we'll probably want the LLM to regenerate params
-            for param_name in expected_tool_args.keys():
-                if param_name == 'user_prompt':
-                    continue
-                if param_name not in tool_args:
-                    tool_args[param_name] = None
-
-            if self.config.debug:
-                print(f'Please standby while I run the tool {tool.name}...')
-                print(f'("{parsed_response["Tool query"]}", {tool_args})')
-                print()
-            response = utils.highlight_code(
-                tool.obj(parsed_response['Tool query'], **tool_args),
-                self.config.colorscheme
-            )
-
-        else:
-            response = utils.highlight_code(
+        # Continually run tools until an answer has been reached
+        previous_steps = []
+        while 'Tool' in parsed_response:
+            dispatch_response = self.run_tool(
+                dispatch_prompt, parsed_response, previous_steps)
+            parsed_response = autils.parse_response(
                 dispatch_response,
-                self.config.colorscheme
+                keywords=['Response', 'Reason', 'Tool', 'Tool query']
             )
+            previous_steps.append(dispatch_response)
+
+        response = utils.highlight_code(
+            dispatch_response,
+            self.config.colorscheme
+        )
 
         return response
 
