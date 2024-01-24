@@ -2,24 +2,16 @@
 Verify the database with different tests.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
 import os
 import pickle
-import sys
-
-import click
 
 import chromadb
 import click
-import git
-import tqdm
 import yaml
 
 from groundcrew.dataclasses import Config
 from groundcrew import code
 from groundcrew import constants
-from groundcrew import utils
-from groundcrew import tools
 
 
 @click.command()
