@@ -64,16 +64,13 @@ def test_findusage_tool():
     assert tool.get_usage('xyz.abc') == {'foo.py':2, 'bar.py': 1}
 
     assert tool.summarize_usage({'foo.py': 2, 'bar.py': 1}) == (
-        'Usage summary (filename: usage count):\n'
         'foo.py: 2\n'
         'bar.py: 1\n'
     )
     assert tool.summarize_usage({'test.py': 999}) == (
-        'Usage summary (filename: usage count):\n'
         'test.py: 999\n'
     )
     assert tool.summarize_usage({}) == (
-        'Usage summary (filename: usage count):\n'
         'No usage found.\n'
     )
 

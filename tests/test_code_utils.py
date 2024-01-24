@@ -68,11 +68,8 @@ def test_get_imports():
 def test_import_module_entity():
     imports = cu.get_imports_from_code(TEST_CODE)
     assert cu.imports_entity(imports, 'numpy')
-    assert cu.imports_entity(imports, 'numpy', 'random')
-    assert cu.imports_entity(imports, 'numpy', 'random.rand')
-    assert cu.imports_entity(imports, 'numpy.random', 'rand')
-    # assert cu.uses_module(imports, 'numpy')
-    # assert not cu.uses_module(imports, 'numpy.random')
+    assert cu.imports_entity(imports, 'numpy.random')
+    assert cu.imports_entity(imports, 'numpy.random.rand')
 
     assert cu.imports_entity(imports, 'torch_fake')
     assert cu.imports_entity(imports, 'torch_fake.tensor')
@@ -83,7 +80,7 @@ def test_import_module_entity():
     assert cu.imports_entity(imports, 'torch.nn.Module')
     assert cu.imports_entity(imports, 'torch.nn.Linear')
     assert cu.imports_entity(imports, 'foo.bar.a')
-    assert not cu.imports_entity(imports, 'foo.bar', 'b')
+    assert not cu.imports_entity(imports, 'foo.bar.b')
     assert cu.imports_entity(imports, 'foo.bar.c')
     assert cu.imports_entity(imports, 'baz.utils')
 
