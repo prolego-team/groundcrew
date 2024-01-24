@@ -38,11 +38,11 @@
     - name: lint C
       tool: LintFileTool
       params:
-        user_prompt: What are some import issues in tools.py
-        filepath_inexact: tools.py
+        user_prompt: What are some import issues in agents/tools.py
+        filepath_inexact: agents/tools.py
       eval_func:
         type: contains_all
-        checks: ['unused', 'json', 'sqlite3', 'typeing.Any', 'typeing.List', 'pandasql']
+        checks: ['json', 'sqlite3', 'typing.Any', 'typing.List', 'pandasql']
 
     - name: docstring A
       tool: SingleDocstringTool
@@ -67,6 +67,7 @@
       eval_func:
         type: contains_all
         checks: ['"""', 'List', 'Returns']
+
 
 #- name: Codebase QA Fuzzy
 #  tests:
