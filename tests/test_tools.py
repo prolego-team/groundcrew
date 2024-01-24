@@ -5,34 +5,77 @@ import chromadb
 
 from groundcrew import constants
 from groundcrew import tools
-from groundcrew.tools import cyclomatic_complexity
 
 
-# def test_cyclomatic_complexity():
-#     code = (
-#         'def foo(x):\n'
-#         '    if x > 0:\n'
-#         '        return x\n'
-#         '    else:\n'
-#         '        return -x\n'
-#     )
-#     cc = cyclomatic_complexity(code)
-#     assert cc['foo']['object'] == 'function'
-#     assert cc['foo']['complexity'] == 2
+def test_findusage_tool():
+    """tests for findusagetool"""
 
-#     code = (
-#         'class Foo:\n'
-#         '    def __init__(self):\n'
-#         '        self.x = 0\n'
-#         '    def bar(self):\n'
-#         '        if self.x > 0:\n'
-#         '            return self.x\n'
-#         '        else:\n'
-#         '            return -self.x\n'
-#     )
-#     cc = cyclomatic_complexity(code)
-#     assert cc['Foo']['object'] == 'class'
-#     assert cc['Foo']['complexity'] == 3
+    # in memory client for testing
+    client = chromadb.EphemeralClient()
+    collection = client.get_or_create_collection(
+        name='test'
+    )
+
+    ids = [
+        'foo.py',
+        'bar.py',
+        'README.md'
+    ]
+    source_code = [
+        (
+            'import numpy as np\n'
+            'from xyz import abc\n'
+            'print(np.random.rand())\n'
+            '# more code\n'
+            'print(np.dot(x,y))\n'
+            'abc(1), abc(2)'
+        ),
+        (
+            'from torch.nn import Module, Linear\n'
+            'import numpy as np\n'
+            'from xyz import abc\n'
+            'print(Module())\n'
+            'print(Module())\n'
+            'abc(1)'
+        ),
+        'read me'
+    ]
+    metadatas = [
+        {'type': 'file', 'id': 'foo.py', 'filepath': 'foo.py', 'text': source_code[0]},
+        {'type': 'file', 'id': 'bar.py', 'filepath': 'bar.py', 'text': source_code[1]},
+        {'type': 'file', 'id': 'README.md', 'filepath': 'README.md', 'text': source_code[2]},
+    ]
+
+    collection.upsert(
+        ids=ids,
+        metadatas=metadatas,
+        documents=['garbage'] * len(ids)
+    )
+
+    llm_mock = lambda x: x
+
+    tool = tools.FindUsageTool('You are a tool.', collection, llm_mock)
+    assert tool.get_usage('numpy') == {'foo.py': 2}
+    assert tool.get_usage('numpy.rand') == {'foo.py': 1}
+    assert tool.get_usage('numpy.random.rand') == {'foo.py': 1}
+    assert tool.get_usage('numpy.random.rand') == {'foo.py': 1}
+    assert tool.get_usage('torch.nn.Module') == {'bar.py': 2}
+    assert tool.get_usage('torch.nn.Linear') == {}
+    assert tool.get_usage('xyz.abc') == {'foo.py':2, 'bar.py': 1}
+
+    assert tool.summarize_usage({'foo.py': 2, 'bar.py': 1}) == (
+        'Usage summary (filename: usage count):\n'
+        'foo.py: 2\n'
+        'bar.py: 1\n'
+    )
+    assert tool.summarize_usage({'test.py': 999}) == (
+        'Usage summary (filename: usage count):\n'
+        'test.py: 999\n'
+    )
+    assert tool.summarize_usage({}) == (
+        'Usage summary (filename: usage count):\n'
+        'No usage found.\n'
+    )
 
 
 def test_complexity_tool():
@@ -98,7 +141,7 @@ def test_complexity_tool():
     llm_mock = lambda x: x
 
     tool = tools.CyclomaticComplexityTool('You are a tool.', collection, llm_mock)
-    assert set(tool.get_files().keys()) == {'foo.py', 'bar.py'}
+    assert set(tools.get_python_files(collection).keys()) == {'foo.py', 'bar.py'}
     assert tool.get_complexity(source_code[0]) == {
         'average': 3.0,
         'max': 4,

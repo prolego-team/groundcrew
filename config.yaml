@@ -1,5 +1,5 @@
 repository: ../neo-sophia
-extensions: ['.py', '.txt', '.yaml', '.yml', '.sh', '.md', '.toml']
+extensions: ['.py']
 db_path: .database/
 cache_dir: .cache/
 Tools:
@@ -9,5 +9,6 @@ Tools:
       - SingleDocstringTool
       - LintFileTool
       - CyclomaticComplexityTool
+      - FindUsageTool
 colorscheme: 'gruvbox-dark'
-debug: false
+debug: true

@@ -8,7 +8,7 @@ from radon.visitors import ComplexityVisitor
 @dataclass
 class Import:
     name: str
-    asname: str | None
+    asname: str
 
 
 def get_imports_from_code(code: str) -> list[Import]:
@@ -29,48 +29,54 @@ def get_imports_from_code(code: str) -> list[Import]:
                 name = entity.name
                 alias = entity.asname if entity.asname is not None else name
                 imports.append(Import(f'{module_name}.{name}', alias))
+                if line.level > 0:
+                    print('Warning: import with level > 0')
 
     return imports
 
 
-def get_imports_from_file(filepath: str) -> list[Import]:
-    """Returns a list of Import objects for the given file."""
-    with open(filepath, 'r') as f:
-        code = f.read()
-    return get_imports_from_code(code)
+def imports_entity(
+        imports: list[Import],
+        importable_object: str,
+    ) -> bool:
+    """Returns True if the imports list imports the entity from the module.
 
-
-def get_imports_from_files(filepaths: list[str]) -> dict[str, Import]:
-    """Returns a list of Import objects for the given files."""
-    imports = {}
-    for file in filepaths:
-        imports[file] = get_imports_from_file(file)
-    return imports
-
-
-def imports_entity(imports: list[Import], module: str, entity: str) -> bool:
-    """Returns True if the imports list imports the entity from the module."""
+    If entity is None, returns True if the imports list imports the module.
+    If entity is not None, returns True if the imports list imports the entity from
+    the module."""
+    test = importable_object.split('.')
     for imp in imports:
-        if imp.name.endswith(module):
-            return True
-        elif imp.name.endswith(f'{module}.{entity}'):
+        imp_name = imp.name.split('.')
+        n = min(len(imp_name), len(test))
+        if test[:n] == imp_name[:n]:
             return True
 
     return False
 
 
-def import_called_as(imports: list[Import], module: str, entity: str) -> str:
+def import_called_as(
+        imports: list[Import],
+        importable_object: str,
+    ) -> str:
     """Returns the name of the entity if the imports list imports the entity.
 
     The returned string provides the name of the entity as it is called in the code,
-    accounting for import aliases.  If the entity is not found, None is returned."""
-    for imp in imports:
-        if imp.name.endswith(module):
-            return f'{imp.asname}.{entity}'
-        elif imp.name.endswith(f'{module}.{entity}'):
-            return imp.asname
+    accounting for import aliases. If the entity is None, the name of the module is
+    returned as it is aliased in the code.
 
-    return None
+    If the entity or module is not found, None is returned."""
+    test = importable_object.split('.')
+    calls = []
+    for imp in imports:
+        imp_name = imp.name.split('.')
+        n = min(len(imp_name), len(test))
+        if test[:n] == imp_name[:n]:
+            call = imp.asname
+            if n < len(test):
+                call += '.' + '.'.join(test[n:])
+            calls.append(call)
+
+    return calls
 
 
 def cyclomatic_complexity(code: str) -> dict:

@@ -207,21 +207,20 @@ def main(config: str, model: str):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         filepath = opj(config.repository, filepath)
-        summarize_file(filepath, llm, descriptions)
 
         # TODO - remove before merging
-        #if 'examples' in filepath:
-        #    continue
-        #if 'src/neosophia/agents' not in filepath:
-        #    continue
-        #if 'test_' in filepath:
-        #    continue
-        #if 'tools.py' in filepath or 'util.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
-        #if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
-        #if i > 3:
-        #    break
+        if 'examples' in filepath:
+           continue
+        if 'src/neosophia/agents' not in filepath:
+           continue
+        if 'test_' in filepath:
+           continue
+        if 'tools.py' in filepath or 'util.py' in filepath:
+           summarize_file(filepath, llm, descriptions)
+        if 'agents/utils.py' in filepath or 'agents/agent.py' in filepath:
+           summarize_file(filepath, llm, descriptions)
+
+        summarize_file(filepath, llm, descriptions)
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:
@@ -254,6 +253,12 @@ def main(config: str, model: str):
         config.repository
     )
     utils.save_tools_to_yaml(tools, tools_filepath)
+
+    # while True:
+    #     ent = input('entity> ')
+    #     print(tools['FindUsageTool'].obj.get_usage(ent))
+
+    # exit()
 
     # The agent LLM is a chat LLM that takes a list of messages as input and
     # returns a message

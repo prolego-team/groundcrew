@@ -10,8 +10,7 @@ from chromadb.api.models.Collection import Collection
 from thefuzz import process as fuzzprocess
 from chromadb import Collection
 
-from groundcrew import code, system_prompts as sp
-from groundcrew.code_utils import cyclomatic_complexity
+from groundcrew import code, system_prompts as sp, code_utils as cu
 from groundcrew.dataclasses import Chunk
 
 
@@ -50,6 +49,19 @@ def query_codebase(
             )
     ]
 
+
+def get_python_files(collection: Collection) -> dict[str, str]:
+    """Get items from the collection"""
+    all_items = collection.get(
+        include=['metadatas'],
+        where={'type': 'file'}
+    )
+
+    return {
+        id_: metadata['text']
+        for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
+        if id_[-3:] == '.py'
+    }
 
 class LintFileTool:
     """
@@ -349,23 +361,10 @@ class CyclomaticComplexityTool:
 
         return self.llm(prompt)
 
-    def get_files(self):
-        """Get items from the collection"""
-        all_items = self.collection.get(
-            include=['metadatas'],
-            where={'type': 'file'}
-        )
-
-        return {
-            id_: metadata['text']
-            for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
-            if id_[-3:] == '.py'
-        }
-
     def get_complexity(self, source_code: str) -> dict[str, dict]:
         """Get the complexity of source code."""
 
-        complexity_dict = cyclomatic_complexity(source_code)
+        complexity_dict = cu.cyclomatic_complexity(source_code)
         if len(complexity_dict) == 0:
             average_complexity, max_complexity = 0, 0
         else:
@@ -380,7 +379,7 @@ class CyclomaticComplexityTool:
 
     def complexity_analysis(self, sort_on: str) -> tuple[list[str], dict]:
         """Analyze the complexity of the codebase."""
-        files = self.get_files()
+        files = get_python_files(self.collection)
 
         file_complexity = {}
         current_max = 0
@@ -427,5 +426,78 @@ class CyclomaticComplexityTool:
                     summary_str += f'  {name}: {desc["complexity"]}\n'
                     for method, method_desc in desc['methods'].items():
                         summary_str += f'    {name}.{method}: {method_desc["complexity"]}\n'
+
+        return summary_str
+
+
+class FindUsageTool:
+
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable
+        ):
+        self.collection = collection
+        self.llm = llm
+        self.base_prompt = base_prompt
+
+    def __call__(self, user_prompt: str, importable_object: str) -> str:
+        """Answer questions using about the usage of a given importable object.
+
+        The importable_object should be the name of a module, function, class, or
+        variable.  It should be a fully qualified name, e.g. 'numpy.random' or
+        'numpy.random.randint'.
+
+        This method will create a summary of the usage of the importable object to help
+        answer the question.  Specifically, it will list the files that import the
+        object and the number of times the object is used in each file.
+        """
+        usage = self.get_usage(importable_object)
+
+        prompt = (
+            f'Usage summary for {importable_object} (filename: usage count):\n' +
+            self.summarize_usage(usage) +
+            '\n### Task ###\n' + self.base_prompt +
+            '\n### Question ###\n' + user_prompt + '\n'
+        )
+        print(prompt)
+
+        return self.llm(prompt)
+
+    def get_usage(self, importable_object: str) -> dict[str, int]:
+        """Get the usage of an entity from a package/module."""
+        files = get_python_files(self.collection)
+
+
+        usages = {}
+        for file, source_code in files.items():
+            file_imports = cu.get_imports_from_code(source_code)
+            # print('File: ', file)
+            # print('Imports:', file_imports)
+            if cu.imports_entity(file_imports, importable_object):
+                called_as = cu.import_called_as(file_imports, importable_object)
+                source_without_imports = '\n'.join(
+                    line for line in source_code.split('\n')
+                    if 'import' not in line
+                )
+                # print('Called as', called_as)
+                usage_count = sum(source_without_imports.count(call) for call in called_as)
+                if usage_count > 0:
+                    # print(usage_count)
+                    usages[file] = usage_count
+
+                # print()
+
+        return usages
+
+    def summarize_usage(self, usage: dict[int, str]) -> str:
+        """Summarize a usage dict containing file names and usage counts."""
+        summary_str = ''
+        if len(usage) == 0:
+            return summary_str + 'No usage found.\n'
+
+        for file, count in usage.items():
+            summary_str += f'{file}: {count}\n'
 
         return summary_str
