@@ -461,7 +461,6 @@ class FindUsageTool:
             '\n### Task ###\n' + self.base_prompt +
             '\n### Question ###\n' + user_prompt + '\n'
         )
-        print(prompt)
 
         return self.llm(prompt)
 
@@ -473,21 +472,15 @@ class FindUsageTool:
         usages = {}
         for file, source_code in files.items():
             file_imports = cu.get_imports_from_code(source_code)
-            # print('File: ', file)
-            # print('Imports:', file_imports)
             if cu.imports_entity(file_imports, importable_object):
                 called_as = cu.import_called_as(file_imports, importable_object)
                 source_without_imports = '\n'.join(
                     line for line in source_code.split('\n')
                     if 'import' not in line
                 )
-                # print('Called as', called_as)
                 usage_count = sum(source_without_imports.count(call) for call in called_as)
                 if usage_count > 0:
-                    # print(usage_count)
                     usages[file] = usage_count
-
-                # print()
 
         return usages
 
