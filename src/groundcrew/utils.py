@@ -18,9 +18,9 @@ from pygments.lexers import PythonLexer
 from pygments.formatters import Terminal256Formatter
 
 from groundcrew import system_prompts as sp
-from groundcrew.dataclasses import Tool
 from groundcrew.llm import openaiapi
 from groundcrew.llm.openaiapi import Message
+from groundcrew.dataclasses import Tool
 
 
 def highlight_code_helper(text: str, colorscheme: str) -> str:
@@ -201,6 +201,11 @@ def setup_tools(
                 tool_info_dict = yaml.safe_load(tool_yaml)
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
+
+                # Remove the user_prompt from the params in case the LLM added
+                # it
+                if 'user_prompt' in tool_info_dict['params']:
+                    del tool_info_dict['params']['user_prompt']
 
                 params['base_prompt'] = tool_info_dict['base_prompt']
 
