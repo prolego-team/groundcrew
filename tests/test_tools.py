@@ -6,6 +6,13 @@ import chromadb
 from groundcrew import constants, tools
 
 
+def _clear_collection(collection: chromadb.Collection) -> None:
+    """clear a collection"""
+    uids = collection.get()['ids']
+    if uids:
+        collection.delete(ids=uids)
+
+
 def test_singledocstringtool():
     """
     Tests for SingleDocstringTool
@@ -122,37 +129,37 @@ def test_singledocstringtool():
         id_='apples.py',
         filename='apples.py',
         function_name='none')
-    assert out is True
+    assert out
 
     out = tool._id_matches_file(
         id_='src/apples.py',
         filename='src/apples.py',
         function_name='none')
-    assert out is True
+    assert out
 
     out = tool._id_matches_file(
         id_='apples.py',
         filename='apples.py',
         function_name='foo')
-    assert out is False
+    assert not out
 
     out = tool._id_matches_file(
         id_='apples.py::foo (function)',
         filename='apples.py',
         function_name='foo')
-    assert out is True
+    assert out
 
     out = tool._id_matches_file(
         id_='apples.py::foo (function)',
         filename='apples.py',
         function_name='none')
-    assert out is True
+    assert out
 
     out = tool._id_matches_file(
         id_='apples.py::foo (function)',
         filename='bananas.py',
         function_name='none')
-    assert out is False
+    assert not out
 
     #### End test _id_matches_file ####
 
@@ -161,22 +168,22 @@ def test_singledocstringtool():
     out = tool._id_matches_function(
         id_='apples.py::foo (function)',
         function_name='foo')
-    assert out is True
+    assert out
 
     out = tool._id_matches_function(
         id_='apples.py::foo (function)',
         function_name='none')
-    assert out is False
+    assert not out
 
     out = tool._id_matches_function(
         id_='bananas.py',
         function_name='foo')
-    assert out is False
+    assert not out
 
     out = tool._id_matches_function(
         id_='bananas.py',
         function_name='none')
-    assert out is False
+    assert not out
 
     #### End test _id_matches_function ####
 
@@ -221,9 +228,3 @@ def test_lintfiletool():
         '2': 'src/oranges.py'
     }
 
-
-def _clear_collection(collection: chromadb.Collection) -> None:
-    """clear a collection"""
-    uids = collection.get()['ids']
-    if uids:
-        collection.delete(ids=uids)

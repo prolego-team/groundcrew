@@ -168,7 +168,7 @@ def summarize_file(
 @click.option('--config', '-c', default='config.yaml')
 @click.option('--model', '-m', default='gpt-4-1106-preview')
 @click.option('--prompts_file', '-p', default=None)
-def main(config: str, model: str, prompts_file: str):
+def main(config: str, model: str, prompts_file: str | None):
     """
     Main run script
 
