@@ -123,6 +123,12 @@ def test_singledocstringtool():
     assert out is True
 
     out = tool._id_matches_file(
+        id_='src/apples.py',
+        filename='src/apples.py',
+        function_name='none')
+    assert out is True
+
+    out = tool._id_matches_file(
         id_='apples.py',
         filename='apples.py',
         function_name='foo')
