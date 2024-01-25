@@ -25,9 +25,9 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to address a question or command from a user in the ### Question ### seciton. You will do this in a step by step manner by choosing the correct Tool and parameters necessary for this task. The previous Tools used and their results are available to you in the ### Previous Steps ### section. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. When you have the necessary data to complete your task, respond directly to the user with a summary of the steps taken. Do not ask the user for filepaths or filenames. You must use the tools available to you. Your answer must be in one of the following two formats.
+CHOOSE_TOOL_PROMPT = """Your task is to address a question or command from a user in the ### Question ### seciton. You will do this in a step by step manner by choosing the correct Tool and parameters necessary for this task. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. When you have the necessary data to complete your task, respond directly to the user with a summary of the steps taken. Do not ask the user for filepaths or filenames. You must use the tools available to you. Your answer must be in one of the following two formats.
 
-(1) If you are choosing the correct Tool and parameters, use this format:
+(1) If you are choosing the correct Tool and parameters, use the following format. Do not use references to variables, you must put the value being passed in the Variable value section. If passing in code, do not include backticks.
 Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
 Tool: Tool Name
 Tool query: Provide a query to the Tool to get the answer to the question.

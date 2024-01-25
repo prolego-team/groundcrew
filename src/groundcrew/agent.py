@@ -79,11 +79,11 @@ class Agent:
             None
         """
         self.messages.append(UserMessage(user_prompt))
-        spinner = yaspin(text='Thinking...', color='green')
-        spinner.start()
+        #spinner = yaspin(text='Thinking...', color='green')
+        #spinner.start()
         response = self.dispatch(user_prompt)
         self.messages.append(AssistantMessage(response))
-        spinner.stop()
+        #spinner.stop()
         self.print(response, 'agent')
 
     def run(self):
@@ -113,31 +113,7 @@ class Agent:
 
             self.interact(user_prompt)
 
-    def run_with_prompts(self, prompts: list[str]):
-        """
-        Process a list of user prompts and respond using the chosen tool
-        based on the input.
-
-        Args:
-            prompts (List[str]): List of prompts to be processed by the agent.
-        """
-        for i, user_prompt in enumerate(prompts):
-
-            if i == 0:
-                self.print(user_prompt, 'user')
-
-            self.interact(user_prompt)
-
-            if i < len(prompts) - 1:
-                print('Next prompt:')
-                self.print(prompts[i + 1], 'user')
-                input('\nPress enter to continue...\n')
-
-        self.run()
-
-    def run_tool(self, dispatch_prompt, parsed_response, previous_steps):
-
-        previous_steps = '\n\n'.join(previous_steps)
+    def run_tool(self, parsed_response):
 
         tool_selection = parsed_response['Tool']
         if tool_selection not in self.tools:
@@ -168,33 +144,21 @@ class Agent:
             print(f'("{parsed_response["Tool query"]}", {tool_args})')
             print()
 
-        response = utils.highlight_code(
+        return tool.obj(parsed_response['Tool query'], **tool_args)
+
+        return utils.highlight_code(
             tool.obj(parsed_response['Tool query'], **tool_args),
             self.config.colorscheme
         )
 
-        return response
-
-    def dispatch(self, user_prompt: str) -> str:
+    def select_tool(self, user_prompt: str):
         """
-        Analyze the user's input and and either respond or choose an appropriate
-        tool for generating a response. When a tool is called, the output from
-        the tool will be returned as the response.
 
-        Args:
-            user_prompt (str): The user's input or question.
-
-        Returns:
-            str: The response from the tool or LLM.
         """
 
         dispatch_prompt = '### Tools ###\n'
         for tool in self.tools.values():
             dispatch_prompt += tool.to_yaml() + '\n\n'
-
-        previous_steps_prompt = '### Previous Steps ###\n'
-
-        dispatch_prompt += previous_steps_prompt
 
         dispatch_prompt += '### Question ###\n'
         dispatch_prompt += user_prompt + '\n\n'
@@ -202,37 +166,136 @@ class Agent:
         # Put instructions at the end of the prompt
         dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
 
-        dispatch_messages = self.messages + [UserMessage(dispatch_prompt)]
+        dispatch_messages = self.dispatch_messages + [UserMessage(dispatch_prompt)]
         dispatch_response = self.llm(dispatch_messages)
 
         if self.config.debug:
             print(Colors.MAGENTA)
-            print(dispatch_messages, Colors.ENDC, '\n')
+            [print(x, '\n') for x in dispatch_messages]
+            print(Colors.ENDC)
             print(Colors.GREEN)
             print(dispatch_response, Colors.ENDC)
 
-        parsed_response = autils.parse_response(
+        return autils.parse_response(
             dispatch_response,
             keywords=['Response', 'Reason', 'Tool', 'Tool query']
-        )
+        ), dispatch_response
 
-        # Continually run tools until an answer has been reached
-        previous_steps = []
-        while 'Tool' in parsed_response:
-            dispatch_response = self.run_tool(
-                dispatch_prompt, parsed_response, previous_steps)
-            parsed_response = autils.parse_response(
-                dispatch_response,
-                keywords=['Response', 'Reason', 'Tool', 'Tool query']
+    def print_dm(self):
+        print('\n', '*' * 50, '\n')
+        for message in self.dispatch_messages:
+            if message.role == 'user':
+                color = Colors.GREEN
+            elif message.role == 'system':
+                color = Colors.RED
+            elif message.role == 'assistant':
+                color = Colors.BLUE
+
+            print('Role:', message.role)
+            print(color)
+            print(message.content)
+            print(Colors.ENDC)
+        print('\n', '*' * 50, '\n')
+        input('Press enter to continue...')
+
+    def dispatch(self, user_prompt: str) -> str:
+        """
+        """
+
+        self.dispatch_messages = [
+            SystemMessage(
+                'You are an assistant that aids a user by choosing a tool to help complete a task.'
             )
-            previous_steps.append(dispatch_response)
+        ]
 
-        response = utils.highlight_code(
-            dispatch_response,
-            self.config.colorscheme
-        )
+        self.dispatch_messages.append(UserMessage(user_prompt))
 
-        return response
+        # Choose tool or get a response
+        parsed_response, dispatch_response = self.select_tool(user_prompt)
+
+        self.dispatch_messages.append(AssistantMessage(dispatch_response))
+
+        # No Tool selected - this should be an answer
+        if 'Tool' not in parsed_response:
+            return utils.highlight_code(
+                dispatch_response,
+                self.config.colorscheme
+            )
+
+        while True:
+
+            # Run Tool
+            tool_response = self.run_tool(parsed_response)
+
+            self.dispatch_messages.append(
+                AssistantMessage('Tool response\n' + tool_response)
+            )
+
+            # Check if the tool response is an answer to the user_prompt
+            answer = self.check_answer(user_prompt)
+
+            if answer.lower() == 'yes':
+                return tool_response
+
+            parsed_response, dispatch_response = self.select_tool(user_prompt)
+
+            self.dispatch_messages.append(AssistantMessage(dispatch_response))
+
+            self.print_dm()
+
+            # Agent responded something like "I will now call the Tool..." but
+            # didn't actually format it correctly or generate parameters.
+            if 'Tool' not in parsed_response:
+                print(Colors.RED)
+                print(parsed_response)
+                print(Colors.ENDC)
+                print('Calling select tool again...')
+                parsed_response, dispatch_response = self.select_tool(user_prompt)
+                print('parsed_response')
+                print(parsed_response)
+
+            input('Press enter...')
+
+        return dispatch_response
+
+    def check_answer(self, user_prompt):
+
+        prompt = '### Question ###\n'
+        prompt += user_prompt + '\n\n'
+        prompt += 'Your task is to determine if the above information is an answer to the question. If it is, respond with "yes". If it is not, respond with "no".'
+
+        prompt = self.dispatch_messages + [UserMessage(prompt)]
+        print(Colors.YELLOW)
+        [print(x) for x in prompt]
+        print(Colors.ENDC, '\n')
+
+        answer = self.llm(prompt)
+        print(Colors.CYAN)
+        print('answer', answer)
+        print(Colors.ENDC)
+        return answer
+
+    def run_with_prompts(self, prompts: list[str]):
+        """
+        Process a list of user prompts and respond using the chosen tool
+        based on the input.
+
+        Args:
+            prompts (List[str]): List of prompts to be processed by the agent.
+        """
+        for i, user_prompt in enumerate(prompts):
+
+            if i == 0:
+                self.print(user_prompt, 'user')
+
+            self.interact(user_prompt)
+
+            if i < len(prompts) - 1:
+                print('Next prompt:')
+                self.print(prompts[i + 1], 'user')
+                input('\nPress enter to continue...\n')
+
+        self.run()
 
     def extract_params(
             self,
