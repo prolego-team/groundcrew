@@ -295,10 +295,9 @@ class SingleDocstringTool:
             id_ (str): The ID to check.
             filename (str): The filename to check against.
             function_name (str): The optional function name to check against.
-            If function_name is 'none', then this will add all functions in the
-            matched file
         """
-        if get_filename_from_id(id_) == filename:
+
+        if get_filename_from_id(id_) == filename or id_ == filename:
             return True if function_name == 'none' or f'::{function_name}' in id_ else False
         return False
 
@@ -344,8 +343,6 @@ class CodebaseQATool:
 
         prompt = ''
         for chunk in chunks:
-            #print(chunk.text)
-            #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
 
