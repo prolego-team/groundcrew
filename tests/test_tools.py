@@ -18,6 +18,8 @@ def test_singledocstringtool():
     collection = client.get_or_create_collection(
         name=constants.DEFAULT_COLLECTION_NAME
     )
+    _clear_collection(collection)
+
     example_ids = [
         'apples.py',
         'apples.py::foo (function)',
@@ -187,6 +189,7 @@ def test_lintfiletool():
     collection = client.get_or_create_collection(
         name=constants.DEFAULT_COLLECTION_NAME
     )
+    _clear_collection(collection)
 
     example_ids_metadatas = [
         (str(idx), dict(filepath=f'src/{name}.py'))
@@ -217,3 +220,10 @@ def test_lintfiletool():
         '1': 'src/bananas.py',
         '2': 'src/oranges.py'
     }
+
+
+def _clear_collection(collection: chromadb.Collection) -> None:
+    """clear a collection"""
+    uids = collection.get()['ids']
+    if uids:
+        collection.delete(ids=uids)
