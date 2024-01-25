@@ -23,7 +23,7 @@ CLASS_NODE_TYPE = ast.ClassDef
 FUNCTION_NODE_TYPE = ast.FunctionDef
 
 
-def populate_db(descriptions: dict[str, str], collection: Collection):
+def populate_db(descriptions: dict[str, str], collection: Collection) -> None:
     """
     Populate a database with metadata and descriptions of Python functions
     extracted from a list of files.
@@ -81,7 +81,7 @@ def summarize_file(
         filepath: str,
         repo_dir_path: str,
         llm: Callable,
-        descriptions: dict):
+        descriptions: dict) -> None:
     """
     Function to summarize a file. If the file is a python file, it will search
     for functions and classes and summarize those as well.

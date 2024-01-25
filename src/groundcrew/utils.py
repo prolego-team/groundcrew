@@ -204,6 +204,11 @@ def setup_tools(
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
 
+                # Remove the user_prompt from the params in case the LLM added
+                # it
+                if 'user_prompt' in tool_info_dict['params']:
+                    del tool_info_dict['params']['user_prompt']
+
                 params['base_prompt'] = tool_info_dict['base_prompt']
 
                 tool_constructor = getattr(module, node.name)
