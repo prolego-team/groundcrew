@@ -6,7 +6,7 @@ import ast
 from git import Repo
 
 from groundcrew.constants import DEFAULT_EF
-from groundcrew.dataclasses import Chunk
+from groundcrew.data_structs import Chunk
 
 opj = os.path.join
 

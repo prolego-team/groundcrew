@@ -16,7 +16,7 @@ import click
 import tqdm
 import yaml
 
-from groundcrew.dataclasses import Config
+from groundcrew.data_structs import Config
 from groundcrew import tools
 from groundcrew import code
 

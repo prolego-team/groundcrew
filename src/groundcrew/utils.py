@@ -18,7 +18,7 @@ from pygments.lexers import PythonLexer
 from pygments.formatters import Terminal256Formatter
 
 from groundcrew import system_prompts as sp
-from groundcrew.dataclasses import Tool
+from groundcrew.data_structs import Tool
 from groundcrew.llm import openaiapi
 from groundcrew.llm.openaiapi import Message
 

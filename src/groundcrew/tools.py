@@ -10,7 +10,7 @@ from thefuzz import process as fuzzprocess
 from chromadb import Collection
 
 from groundcrew import code, system_prompts as sp
-from groundcrew.dataclasses import Chunk
+from groundcrew.data_structs import Chunk
 
 
 def query_codebase(
@@ -298,11 +298,12 @@ class CodebaseQATool:
         Returns:
             str: The generated response from the language model.
         """
-        chunks = query_codebase(user_prompt, self.collection)
+        chunks = query_codebase(user_prompt, self.collection, n_results=5)
 
         prompt = ''
         for chunk in chunks:
-            #print(chunk.text)
+            print(chunk)
+            print()
             #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
@@ -311,3 +312,86 @@ class CodebaseQATool:
         prompt += f'{user_prompt}\n\n'
 
         return self.llm(prompt)
+
+
+class GetFileContentsTool:
+    """
+    Interact with the contents of a specific file using natural language.
+    """
+
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable,
+            working_dir_path: str):
+        """Constructor."""
+        self.collection = collection
+        self.llm = llm
+        self.base_prompt = base_prompt
+        self.working_dir_path = working_dir_path
+
+    def __call__(
+            self,
+            user_prompt: str,
+            filepath_inexact: str) -> str:
+        """
+        Answer questions about a specific file.
+        filepath_inexact is a file path which can be inexact, it will be fuzzy
+        matched to find an exact file path for the project.
+        """
+
+        # ensure that filepath is a real path of a file in the collection
+        # TODO: figure out what the correct threshold is here...
+        #       probably higher than 50
+        filepath = self.fuzzy_match_file_path(filepath_inexact, 50)
+
+        if filepath is None:
+            return f'Could not find a source file matching `{filepath_inexact}`'
+
+        items = self.collection.get(
+            include=['metadatas'],
+            where = {'filepath': filepath}
+        )
+
+        prompt = (
+            f'Here is file {items["metadatas"][0]["filepath"]}:\n\n' +
+            items['metadatas'][0]['text'] + '\n'
+            '\n### Task ###\n' + self.base_prompt +
+            '\n### Question ###\n' + user_prompt + '\n'
+        )
+
+        return self.llm(prompt)
+
+    def fuzzy_match_file_path(self, search: str, thresh: int) -> str | None:
+        """Find a real file path in a collection given an example."""
+
+        # there's a limited number of metadata filter options in chroma
+        # so we'll grab everything and manufally filter
+
+        paths = list(set(self.get_paths().values()))
+
+        # it might be possible to do something where we fuzzy match on ids instead
+        # and then we could filter result lines by chunk
+
+        # fuzzy match on filepaths
+        top, thresh_match = fuzzprocess.extractOne(search, paths)
+
+        if thresh_match < thresh:
+            return None
+        return top
+
+    def get_paths(self) -> dict[str, str]:
+        """Get a dict filepaths (keyed by id) from the collection's metadata."""
+
+        # get all paths and ids
+        all_entries = self.collection.get(
+            include=['metadatas']
+        )
+
+        return {
+            x: y['filepath']
+            for x, y in zip(all_entries['ids'], all_entries['metadatas'])
+        }
+
+

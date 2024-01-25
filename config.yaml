@@ -8,5 +8,6 @@ Tools:
       - CodebaseQATool
       - SingleDocstringTool
       - LintFileTool
+      - GetFileContentsTool
 colorscheme: 'gruvbox-dark'
-debug: false
+debug: true
