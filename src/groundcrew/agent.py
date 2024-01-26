@@ -68,6 +68,23 @@ class Agent:
         print(Colors.ENDC)
         print(text)
 
+    def interact(self, user_prompt: str) -> None:
+        """
+        Process a user prompt and call dispatch
+
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            None
+        """
+        self.messages.append(UserMessage(user_prompt))
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
+        response = self.dispatch(user_prompt)
+        self.messages.append(AssistantMessage(response))
+        spinner.stop()
+        self.print(response, 'agent')
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
@@ -92,21 +109,32 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-
             if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
                 break
 
-            self.messages.append(UserMessage(user_prompt))
+            self.interact(user_prompt)
 
-            spinner = yaspin(text='Thinking...', color='green')
-            spinner.start()
-            response = self.dispatch(user_prompt)
-            self.messages.append(AssistantMessage(response))
-            spinner.stop()
+    def run_with_prompts(self, prompts: list[str]):
+        """
+        Process a list of user prompts and respond using the chosen tool
+        based on the input.
 
-            # TODO - handle params that should be there but are not
+        Args:
+            prompts (List[str]): List of prompts to be processed by the agent.
+        """
+        for i, user_prompt in enumerate(prompts):
 
-            self.print(response, 'agent')
+            if i == 0:
+                self.print(user_prompt, 'user')
+
+            self.interact(user_prompt)
+
+            if i < len(prompts) - 1:
+                print('Next prompt:')
+                self.print(prompts[i + 1], 'user')
+                input('\nPress enter to continue...\n')
+
+        self.run()
 
     def interact_functional(self, user_prompt: str) -> str:
         """
@@ -153,7 +181,7 @@ class Agent:
 
         if self.config.debug:
             print(Colors.MAGENTA)
-            print(dispatch_prompt, Colors.ENDC, '\n')
+            print(dispatch_messages, Colors.ENDC, '\n')
             print(Colors.GREEN)
             print(dispatch_response, Colors.ENDC)
 
@@ -178,6 +206,14 @@ class Agent:
                 if param_name in expected_tool_args:
                     new_args[param_name] = val
             tool_args = new_args
+
+            # Add any missing parameters - default to None for now.
+            # In the future we'll probably want the LLM to regenerate params
+            for param_name in expected_tool_args.keys():
+                if param_name == 'user_prompt':
+                    continue
+                if param_name not in tool_args:
+                    tool_args[param_name] = None
 
             if self.config.debug:
                 print(f'Please standby while I run the tool {tool.name}...')
