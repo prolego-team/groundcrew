@@ -81,10 +81,8 @@ def build_llm_chat_client(
         client = openaiapi.get_openaiai_client()
         chat_session = openaiapi.start_chat(model, client)
 
-        def chat(messages: list[Message]) -> str:
-            response = chat_session(messages)
-            messages.append(response)
-            return response.content
+        def chat(messages: list[Message]) -> Message:
+            return chat_session(messages)
 
     return chat
 

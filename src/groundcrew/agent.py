@@ -79,11 +79,13 @@ class Agent:
             None
         """
         self.messages.append(UserMessage(user_prompt))
-        #spinner = yaspin(text='Thinking...', color='green')
-        #spinner.start()
+        if not self.config.debug:
+            spinner = yaspin(text='Thinking...', color='green')
+            spinner.start()
         response = self.dispatch(user_prompt)
         self.messages.append(AssistantMessage(response))
-        #spinner.stop()
+        if not self.config.debug:
+            spinner.stop()
         self.print(response, 'agent')
 
     def run(self):
@@ -151,151 +153,59 @@ class Agent:
             self.config.colorscheme
         )
 
-    def select_tool(self, user_prompt: str):
-        """
-
-        """
-
-        dispatch_prompt = '### Tools ###\n'
-        for tool in self.tools.values():
-            dispatch_prompt += tool.to_yaml() + '\n\n'
-
-        dispatch_prompt += '### Question ###\n'
-        dispatch_prompt += user_prompt + '\n\n'
-
-        # Put instructions at the end of the prompt
-        dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
-
-        dispatch_messages = self.dispatch_messages + [UserMessage(dispatch_prompt)]
-        dispatch_response = self.llm(dispatch_messages)
-
-        if self.config.debug:
-            print(Colors.MAGENTA)
-            [print(x, '\n') for x in dispatch_messages]
-            print(Colors.ENDC)
-            print(Colors.GREEN)
-            print(dispatch_response, Colors.ENDC)
-
-        return autils.parse_response(
-            dispatch_response,
-            keywords=['Response', 'Reason', 'Tool', 'Tool query']
-        ), dispatch_response
-
-    def print_dm(self):
-        print('\n', '*' * 50, '\n')
-        for message in self.dispatch_messages:
-            if message.role == 'user':
-                color = Colors.GREEN
-            elif message.role == 'system':
-                color = Colors.RED
-            elif message.role == 'assistant':
-                color = Colors.BLUE
-
-            print('Role:', message.role)
-            print(color)
-            print(message.content)
-            print(Colors.ENDC)
-        print('\n', '*' * 50, '\n')
-        input('Press enter to continue...')
-
     def dispatch(self, user_prompt: str) -> str:
         """
         """
 
-        self.dispatch_messages = [
-            SystemMessage(
-                'You are an assistant that aids a user by choosing a tool to help complete a task.'
-            )
-        ]
+        # TODO - update parser to return one Tool
+        # Update language for tool response
+        # Merge dispatch_messages and messages
 
-        self.dispatch_messages.append(UserMessage(user_prompt))
+        system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        system_prompt += '### Tools ###\n'
+        for tool in self.tools.values():
+            system_prompt += tool.to_yaml() + '\n\n'
 
-        # Choose tool or get a response
-        parsed_response, dispatch_response = self.select_tool(user_prompt)
+        self.dispatch_messages = [SystemMessage(system_prompt)]
 
-        self.dispatch_messages.append(AssistantMessage(dispatch_response))
+        user_question = '\n\n### Question ###\n' + user_prompt
+        self.dispatch_messages.append(
+            UserMessage(user_question)
+        )
 
-        # No Tool selected - this should be an answer
-        if 'Tool' not in parsed_response:
-            return utils.highlight_code(
-                dispatch_response,
-                self.config.colorscheme
-            )
-
+        loop_count = 0
         while True:
 
-            # Run Tool
-            tool_response = self.run_tool(parsed_response)
+            # Choose tool or get a response
+            select_tool_response = self.llm(self.dispatch_messages)
+            self.dispatch_messages.append(select_tool_response)
 
-            self.dispatch_messages.append(
-                AssistantMessage('Tool response\n' + tool_response)
+            # Parse the tool selection response
+            parsed_select_tool_response = autils.parse_response(
+                select_tool_response.content,
+                keywords=['Response', 'Reason', 'Tool', 'Tool query']
             )
 
-            # Check if the tool response is an answer to the user_prompt
-            answer = self.check_answer(user_prompt)
+            # No Tool selected - this should be an answer or conversation of sorts
+            if 'Tool' not in parsed_select_tool_response:
+                return utils.highlight_code(
+                    select_tool_response.content,
+                    self.config.colorscheme
+                )
 
-            if answer.lower() == 'yes':
-                return tool_response
+            # Run Tool
+            tool_response = self.run_tool(parsed_select_tool_response)
 
-            parsed_response, dispatch_response = self.select_tool(user_prompt)
-
-            self.dispatch_messages.append(AssistantMessage(dispatch_response))
+            self.dispatch_messages.append(
+                UserMessage('Tool response\n' + tool_response + user_question + '\n\nIf you can answer the complete question do so, otherwise choose a Tool.')
+            )
 
             self.print_dm()
 
-            # Agent responded something like "I will now call the Tool..." but
-            # didn't actually format it correctly or generate parameters.
-            if 'Tool' not in parsed_response:
-                print(Colors.RED)
-                print(parsed_response)
-                print(Colors.ENDC)
-                print('Calling select tool again...')
-                parsed_response, dispatch_response = self.select_tool(user_prompt)
-                print('parsed_response')
-                print(parsed_response)
-
-            input('Press enter...')
+            print('End of loop', loop_count)
+            loop_count += 1
 
         return dispatch_response
-
-    def check_answer(self, user_prompt):
-
-        prompt = '### Question ###\n'
-        prompt += user_prompt + '\n\n'
-        prompt += 'Your task is to determine if the above information is an answer to the question. If it is, respond with "yes". If it is not, respond with "no".'
-
-        prompt = self.dispatch_messages + [UserMessage(prompt)]
-        print(Colors.YELLOW)
-        [print(x) for x in prompt]
-        print(Colors.ENDC, '\n')
-
-        answer = self.llm(prompt)
-        print(Colors.CYAN)
-        print('answer', answer)
-        print(Colors.ENDC)
-        return answer
-
-    def run_with_prompts(self, prompts: list[str]):
-        """
-        Process a list of user prompts and respond using the chosen tool
-        based on the input.
-
-        Args:
-            prompts (List[str]): List of prompts to be processed by the agent.
-        """
-        for i, user_prompt in enumerate(prompts):
-
-            if i == 0:
-                self.print(user_prompt, 'user')
-
-            self.interact(user_prompt)
-
-            if i < len(prompts) - 1:
-                print('Next prompt:')
-                self.print(prompts[i + 1], 'user')
-                input('\nPress enter to continue...\n')
-
-        self.run()
 
     def extract_params(
             self,
@@ -344,3 +254,42 @@ class Agent:
                 args[param_name.replace(' ', '')] = param_value
 
         return args
+
+    def run_with_prompts(self, prompts: list[str]):
+        """
+        Process a list of user prompts and respond using the chosen tool
+        based on the input.
+
+        Args:
+            prompts (List[str]): List of prompts to be processed by the agent.
+        """
+        for i, user_prompt in enumerate(prompts):
+
+            if i == 0:
+                self.print(user_prompt, 'user')
+
+            self.interact(user_prompt)
+
+            if i < len(prompts) - 1:
+                print('Next prompt:')
+                self.print(prompts[i + 1], 'user')
+                input('\nPress enter to continue...\n')
+
+        self.run()
+
+    def print_dm(self):
+        print('\n', '*' * 50, '\n')
+        for message in self.dispatch_messages:
+            if message.role == 'user':
+                color = Colors.GREEN
+            elif message.role == 'system':
+                color = Colors.RED
+            elif message.role == 'assistant':
+                color = Colors.BLUE
+
+            print('Role:', message.role)
+            print(color)
+            print(message.content)
+            print(Colors.ENDC)
+        print('\n', '*' * 50, '\n')
+        input('End of printing, press enter to continue...')
