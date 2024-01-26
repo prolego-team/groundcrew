@@ -26,7 +26,7 @@ class EvalTest:
     """A single test to perform on a tool."""
     name: str
     tool: str
-    params: dict[str, str]
+    params: dict[str, Any]
     eval_func: dict[str, str]
 
 
