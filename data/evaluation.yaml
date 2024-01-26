@@ -48,6 +48,7 @@
       tool: SingleDocstringTool
       params:
         user_prompt: Generate a docstring for the method check_prompt
+        code: none
         filename: none
         function_name: check_prompt
       eval_func:
