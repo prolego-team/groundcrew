@@ -9,5 +9,6 @@ Tools:
       - SingleDocstringTool
       - LintFileTool
       - GetFileContentsTool
+      - InstallationAndUseTool
 colorscheme: 'gruvbox-dark'
 debug: true

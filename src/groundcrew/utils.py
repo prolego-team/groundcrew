@@ -80,10 +80,8 @@ def build_llm_chat_client(model: str = sp.DEFAULT_MODEL) -> Callable[[list[Messa
         client = openaiapi.get_openaiai_client()
         chat_session = openaiapi.start_chat(model, client)
 
-        def chat(messages: list[Message], **kwargs) -> str:
-            response = chat_session(messages, **kwargs)
-            messages.append(response)
-            return response.content, messages
+        def chat(messages: list[Message], **kwargs) -> Message:
+            return chat_session(messages, **kwargs)
 
     return chat
 

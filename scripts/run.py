@@ -247,34 +247,9 @@ def main(config: str, model: str):
 
     # The agent LLM is a chat LLM that takes a list of messages as input and
     # returns a message
-    type_map = {
-        'str': 'string',
-        'int': 'integer',
-        'float': 'number',
-        'bool': 'boolean'
-    }
-    tool_descriptions = [
-        {
-            'description': tool.description,
-            'name': tool.name,
-            'parameters': {
-                'type': 'object',
-                'properties': {
-                    param: {
-                        'type': type_map[param_attrs['type']],
-                        'description': param_attrs['description']
-                    }
-                    for param, param_attrs in tool.params.items()
-                },
-                'required': [param for param, param_attrs in tool.params.items() if param_attrs['required']]
-            }
-        }
-        for tool in tools.values()
-    ]
-    tool_descriptions = [{'type':'function', 'function':func} for func in tool_descriptions]
-    tools = {tool.name: tool.obj for tool in tools.values()}
     agent_chat_llm = utils.build_llm_chat_client(model)
-    agent = OpenAIAgent(config, collection, agent_chat_llm, tool_descriptions, tools)
+    # agent = Agent(config, collection, agent_chat_llm, tools)
+    agent = OpenAIAgent(config, collection, agent_chat_llm, tools)
     agent.run()
 
 

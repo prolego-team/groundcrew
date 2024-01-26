@@ -171,7 +171,7 @@ class Agent:
                 dispatch_messages.append(UserMessage(tool_response))
 
                 check_message = dispatch_messages + [UserMessage(sp.HAPPY_OR_NOT_PROMPT)]
-                dispatch_response, _ = self.llm(check_message)
+                dispatch_response = self.llm(check_message)
                 happy = 'The user\'s question has been answered' in dispatch_response
                 print('happy? ', dispatch_response)
                 if happy:
@@ -258,23 +258,47 @@ class OpenAIAgent:
             config: Config,
             collection: Collection,
             chat_llm: Callable,
-            tool_descriptions: dict,
-            tools: dict
-        ):
+            tools: dict[str, Tool]):
         """
         Constructor
         """
         self.config = config
         self.collection = collection
         self.llm = chat_llm
-        self.tools = tools
-        self.tool_descriptions = tool_descriptions
         self.messages = [SystemMessage(sp.AGENT_PROMPT)]
+
+        type_map = {
+            'str': 'string',
+            'int': 'integer',
+            'float': 'number',
+            'bool': 'boolean'
+        }
+        tool_descriptions = [
+            {
+                'description': tool.description,
+                'name': tool.name,
+                'parameters': {
+                    'type': 'object',
+                    'properties': {
+                        param: {
+                            'type': type_map[param_attrs['type']],
+                            'description': param_attrs['description']
+                        }
+                        for param, param_attrs in tool.params.items()
+                    },
+                    'required': [param for param, param_attrs in tool.params.items() if param_attrs['required']]
+                }
+            }
+            for tool in tools.values()
+        ]
+        self.tool_descriptions = [{'type':'function', 'function':func} for func in tool_descriptions]
+        self.tools = {tool.name: tool.obj for tool in tools.values()}
 
         self.colors = {
             'system': Colors.YELLOW,
             'user': Colors.GREEN,
-            'agent': Colors.BLUE
+            'agent': Colors.BLUE,
+            'tool': Colors.MAGENTA
         }
 
     def print(self, text: str, role: str) -> None:
@@ -317,12 +341,11 @@ class OpenAIAgent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-            self.messages.append(UserMessage(user_prompt))
+
 
             spinner = yaspin(text='Thinking...', color='green')
             spinner.start()
             response = self.dispatch(user_prompt)
-            self.messages.append(AssistantMessage(response))
             spinner.stop()
 
             # TODO - handle params that should be there but are not
@@ -342,23 +365,26 @@ class OpenAIAgent:
             str: The response from the tool or LLM.
         """
 
-
+        self.messages.append(UserMessage(user_prompt))
 
         while True:
-            print('calling LLM')
-            response_str, messages = self.llm(self.messages, tools=self.tool_descriptions)
-            response = messages[-1]
-            print('response: ', response)
+            # print('calling LLM')
+            response = self.llm(self.messages, tools=self.tool_descriptions)
+            self.messages.append(response)
 
             if response.tool_calls is not None:
+                print('Calling tools', [tool.function_name for tool in response.tool_calls])
                 tool_output_messages = [
                     ToolMessage(
                         str(self.tools[tool.function_name](user_prompt=user_prompt, **tool.function_args)),
                         tool.tool_call_id)
                     for tool in response.tool_calls
                 ]
-                print('tool messages: ', tool_output_messages)
+                for tool_message in tool_output_messages:
+                    self.print(tool_message.content, 'tool')
+
                 self.messages += tool_output_messages
+                self.messages.append(UserMessage('Summarize the answer to the question if you are able, otherwise call another tool or say why you are unable to answer the question.'))
 
             else:
                 break

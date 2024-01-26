@@ -4,23 +4,27 @@
 DEFAULT_MODEL = 'gpt-4-1106-preview'
 
 AGENT_PROMPT = """
-You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase. Make your responses as specific as possible given what you know about this particular codebase given your access to the source code and documentation.
-
-The name of the codebase is `neosophia`.
-Here are the folders in the root directory:
-- scripts
-- examples
-- src
-- data
-Here are the files in the root directory:
-- README.md
-- config.yaml
-- env.yml
-- openai_api_key_example.txt
-- pyproject.toml
-- requirements.txt
-- test.sh
+You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase. Make your responses as specific as possible.
 """
+
+# """
+# If the user asks about running or installing the code you should first refer to any available documentation to see if the answer is there.
+
+# The name of the codebase is `neosophia`.
+# Here are the folders in the root directory:
+# - scripts
+# - examples
+# - src
+# - data
+# Here are the files in the root directory:
+# - README.md
+# - config.yaml
+# - env.yml
+# - openai_api_key_example.txt
+# - pyproject.toml
+# - requirements.txt
+# - test.sh
+# """
 
 LINTER_PROMPT = """
 Use the linter output above to answer the following question in a few sentences.

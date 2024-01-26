@@ -302,8 +302,8 @@ class CodebaseQATool:
 
         prompt = ''
         for chunk in chunks:
-            print(chunk)
-            print()
+            # print(chunk)
+            # print()
             #exit()
             prompt += code.format_chunk(chunk, include_text=include_code)
             prompt += '--------\n\n'
@@ -393,3 +393,52 @@ class GetFileContentsTool:
         }
 
 
+class InstallationAndUseTool:
+    """
+    Answer questions about the installation and use of the codebase.
+    """
+
+    def __init__(
+            self,
+            base_prompt: str,
+            collection: Collection,
+            llm: Callable,
+            working_dir_path: str):
+        """Constructor."""
+        self.collection = collection
+        self.llm = llm
+        self.base_prompt = base_prompt
+        self.working_dir_path = working_dir_path
+
+    def __call__(
+            self,
+            user_prompt: str,
+            additional_guidance: str) -> str:
+        """Answer questions about the installation and use of the codebase."""
+
+        # NOTE: Out of the box, the tool loader would not work if there were no parameters beyond
+        # the user_prompt.  I added additional_guidance, but it sucks.  Figure this out sometime
+        # when it's not 5:30 on Friday afternoon.
+        query = "What files contain documentation regarding the installation and use of the codebase. Include README, configuration and environment setup files. "
+        # query += additional_guidance
+        doc_files = query_codebase(query, self.collection, n_results=15, where={'type': 'file'})
+        doc_files_uids = [chunk.uid for chunk in doc_files if '..' not in chunk.filepath]
+
+        results = query_codebase(
+            # 'How do I run the bank_agent.py example?',
+            user_prompt,
+            self.collection, n_results=10,
+            where={'id': {'$in': doc_files_uids}}
+        )
+        # print([result.uid for result in results])
+        # print(len(results))
+
+        prompt = self.base_prompt + '\n\n'
+        for chunk in results:
+            prompt += f'Contents of file {chunk.filepath}:\n'
+            prompt += chunk.text + '\n\n'
+
+        prompt += self.base_prompt + '\n### Question ###\n'
+        prompt += f'{user_prompt}\n\n'
+
+        return self.llm(prompt)
