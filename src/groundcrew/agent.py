@@ -11,8 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import (AssistantMessage, SystemMessage,
-                                      UserMessage)
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage
 
 
 class Agent:
@@ -67,7 +66,7 @@ class Agent:
         print(self.colors[role])
         print(f'[{role}]')
         print(Colors.ENDC)
-        print(text)
+        print(utils.highlight_code(text, self.config.colorscheme))
 
     def interact(self, user_prompt: str) -> None:
         """
@@ -78,15 +77,23 @@ class Agent:
         Returns:
             None
         """
-        self.messages.append(UserMessage(user_prompt))
+
         if not self.config.debug:
-            spinner = yaspin(text='Thinking...', color='green')
-            spinner.start()
-        response = self.dispatch(user_prompt)
-        self.messages.append(AssistantMessage(response))
-        if not self.config.debug:
-            spinner.stop()
-        self.print(response, 'agent')
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
+
+        self.dispatch(user_prompt)
+
+        # Append dispatch messages except for the system prompt
+        self.messages.extend(self.dispatch_messages[1:])
+
+        if self.config.debug:
+            self.print_message_history(self.messages)
+        else:
+            self.spinner.stop()
+
+        # Response with the last message from the agent
+        self.print(self.messages[-1].content, 'agent')
 
     def run(self):
         """
@@ -148,18 +155,11 @@ class Agent:
 
         return tool.obj(parsed_response['Tool query'], **tool_args)
 
-        return utils.highlight_code(
-            tool.obj(parsed_response['Tool query'], **tool_args),
-            self.config.colorscheme
-        )
-
     def dispatch(self, user_prompt: str) -> str:
         """
         """
 
-        # TODO - update parser to return one Tool
-        # Update language for tool response
-        # Merge dispatch_messages and messages
+        self.spinner.stop()
 
         system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
         system_prompt += '### Tools ###\n'
@@ -169,16 +169,19 @@ class Agent:
         self.dispatch_messages = [SystemMessage(system_prompt)]
 
         user_question = '\n\n### Question ###\n' + user_prompt
-        self.dispatch_messages.append(
-            UserMessage(user_question)
-        )
+        self.dispatch_messages.append(UserMessage(user_question))
 
-        loop_count = 0
         while True:
+
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
 
             # Choose tool or get a response
             select_tool_response = self.llm(self.dispatch_messages)
+
+            # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
+            self.spinner.stop()
 
             # Parse the tool selection response
             parsed_select_tool_response = autils.parse_response(
@@ -186,26 +189,23 @@ class Agent:
                 keywords=['Response', 'Reason', 'Tool', 'Tool query']
             )
 
-            # No Tool selected - this should be an answer or conversation of sorts
+            # No Tool selected - this should be an answer
             if 'Tool' not in parsed_select_tool_response:
-                return utils.highlight_code(
-                    select_tool_response.content,
-                    self.config.colorscheme
-                )
+                break
+
+            self.spinner = yaspin(
+                text='Running ' + parsed_select_tool_response['Tool'],
+                color='green'
+            )
+            self.spinner.start()
 
             # Run Tool
             tool_response = self.run_tool(parsed_select_tool_response)
+            self.spinner.stop()
 
             self.dispatch_messages.append(
                 UserMessage('Tool response\n' + tool_response + user_question + '\n\nIf you can answer the complete question do so, otherwise choose a Tool.')
             )
-
-            self.print_dm()
-
-            print('End of loop', loop_count)
-            loop_count += 1
-
-        return dispatch_response
 
     def extract_params(
             self,
@@ -277,9 +277,9 @@ class Agent:
 
         self.run()
 
-    def print_dm(self):
+    def print_message_history(self, messages):
         print('\n', '*' * 50, '\n')
-        for message in self.dispatch_messages:
+        for message in messages:
             if message.role == 'user':
                 color = Colors.GREEN
             elif message.role == 'system':
@@ -292,4 +292,3 @@ class Agent:
             print(message.content)
             print(Colors.ENDC)
         print('\n', '*' * 50, '\n')
-        input('End of printing, press enter to continue...')
