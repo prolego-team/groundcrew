@@ -2,6 +2,7 @@
 Tests for evaluation functions.
 """
 
+import dataclasses
 
 from groundcrew import evaluation
 
@@ -14,7 +15,7 @@ def test_parse_verify():
     # ~~~~ parse
 
     correct = dict(
-        name='Valid Tests',
+        name='Tests',
         tests=[
             dict(
                 name='Test A',
@@ -66,7 +67,47 @@ def test_parse_verify():
     ))
     evaluation.verify_suite(correct_suite, system, eval_funcs)
 
-    # TODO: test bad tools
-    # TODO: test bad eval functions
-    # TODO: test bad eval function params
+    # bad tool
 
+    bad_suite = dataclasses.replace(
+        correct_suite,
+        tests=[
+            evaluation.EvalTest(
+                name='Test A', tool='GarbgeTool', params=dict(x=1, y=2), eval_func=dict()
+            )
+        ]
+    )
+    with pytest.raises(AssertionError) as ae:
+        evaluation.verify_suite(bad_suite, system, eval_funcs)
+    assert str(ae.value) == '`Tests`:`Test A`: tool from suite not in system'
+
+    # tool parameter mismatch
+    bad_suite.tests[0] = dataclasses.replace(bad_suite.tests[0], tool='BaloneyTool')
+    with pytest.raises(AssertionError) as ae:
+        evaluation.verify_suite(bad_suite, system, eval_funcs)
+    assert str(ae.value) == '`Tests`:`Test A`: tool parameter mismatch'
+
+    # bad eval functions
+    bad_suite.tests[0] = dataclasses.replace(
+        bad_suite.tests[0],
+        params=dict(user_prompt='Hello, world!', a=6, b=6),
+    )
+    with pytest.raises(AssertionError) as ae:
+        evaluation.verify_suite(bad_suite, system, eval_funcs)
+    assert str(ae.value) == '`Tests`:`Test A`: eval_func missing type'
+
+    bad_suite.tests[0] = dataclasses.replace(
+        bad_suite.tests[0],
+        eval_func=dict(type='is_correct')
+    )
+    with pytest.raises(AssertionError) as ae:
+        evaluation.verify_suite(bad_suite, system, eval_funcs)
+    assert str(ae.value) == '`Tests`:`Test A`: eval_func type `is_correct` not in eval_funcs'
+
+    bad_suite.tests[0] = dataclasses.replace(
+        bad_suite.tests[0],
+        eval_func=dict(type='contains')
+    )
+    with pytest.raises(AssertionError) as ae:
+        evaluation.verify_suite(bad_suite, system, eval_funcs)
+    assert str(ae.value) == '`Tests`:`Test A`: eval_func parameter mismatch'
