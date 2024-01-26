@@ -354,14 +354,12 @@ class GetFileContentsTool:
             where = {'filepath': filepath}
         )
 
-        prompt = (
+        output = (
             f'Here is file {items["metadatas"][0]["filepath"]}:\n\n' +
-            items['metadatas'][0]['text'] + '\n'
-            '\n### Task ###\n' + self.base_prompt +
-            '\n### Question ###\n' + user_prompt + '\n'
+            items['metadatas'][0]['text']
         )
 
-        return self.llm(prompt)
+        return output
 
     def fuzzy_match_file_path(self, search: str, thresh: int) -> str | None:
         """Find a real file path in a collection given an example."""

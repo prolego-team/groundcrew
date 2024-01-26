@@ -4,7 +4,22 @@
 DEFAULT_MODEL = 'gpt-4-1106-preview'
 
 AGENT_PROMPT = """
-You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase.
+You are an assistant that answers question about a codebase. All of the user\'s questions should be about this particular codebase, and you will be given tools that you can use to help you answer questions about the codebase. Make your responses as specific as possible given what you know about this particular codebase given your access to the source code and documentation.
+
+The name of the codebase is `neosophia`.
+Here are the folders in the root directory:
+- scripts
+- examples
+- src
+- data
+Here are the files in the root directory:
+- README.md
+- config.yaml
+- env.yml
+- openai_api_key_example.txt
+- pyproject.toml
+- requirements.txt
+- test.sh
 """
 
 LINTER_PROMPT = """
@@ -44,6 +59,8 @@ Parameter_0: Parameter_0 Name | Variable value | parameter type
 Parameter_N: Parameter_N Name | Variable value | parameter type
 
 """
+
+HAPPY_OR_NOT_PROMPT = """Your task is to look at the message history and determine if the user's question has been answered satisfactorily. If the user's question has been answered, respond with the single phrase "The user's question has been answered". If the user's question has not been answered, either (1) respond directly to the user's question stating why or (2) choose the correct tool and parameters to gather more information (using the Tool format above). If the previous messages express uncertainty or suggests follow-up actions (like reading documentation or inspecting source code), try to use Tools to provide a more specific answer. Do not engage in any conversation."""
 
 CODEQA_PROMPT = "Your answer should only include information that pertains to the question."
 
