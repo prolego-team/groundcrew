@@ -155,7 +155,7 @@ class Agent:
 
     def dispatch(self, user_prompt: str) -> str:
         """
-        Analyze the user's input and and either respond or choose an appropriate
+        Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
         the tool will be returned as the response.
 

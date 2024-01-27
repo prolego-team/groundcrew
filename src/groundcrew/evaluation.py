@@ -11,7 +11,7 @@ import inspect
 class System:
     """
     A sytem to test.
-    The combination of a set of tools and and LLM determines the system.
+    The combination of a set of tools and LLM determines the system.
     Individual tools hold the chromadb collection so it doesn't need
     to be part of this.
     """
