@@ -224,9 +224,13 @@ def setup_tools(
                 tool_obj = tool_constructor(**args)
 
                 # Check that the tool object has the correct signature
-                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
+                tool_err = 'Tool must have a user_prompt parameter'
+                assert 'user_prompt' in inspect.signature(
+                    tool_obj).parameters, tool_err
 
-                assert isinstance(inspect.signature(tool_obj).return_annotation, str), 'Tool must return a string'
+                tool_err = f'Tool {tool_obj} must return a string'
+                assert inspect.signature(
+                    tool_obj).return_annotation == str, tool_err
 
                 # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
