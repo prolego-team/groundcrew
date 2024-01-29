@@ -89,8 +89,6 @@ def summarize_file(
 
     # TODO - skip file if there are too many tokens
 
-    code_dict = {}
-
     # Get the file text
     with open(opj(repo_dir_path, filepath), 'r') as f:
         file_text = ''.join(f.readlines())
@@ -209,20 +207,6 @@ def main(config: str, model: str, prompts_file: str | None):
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
         summarize_file(filepath, config.repository, llm, descriptions)
-
-        # TODO - remove before merging
-        #if 'examples' in filepath:
-        #    continue
-        #if 'src/neosophia/agents' not in filepath:
-        #    continue
-        #if 'test_' in filepath:
-        #    continue
-        #if 'tools.py' in filepath or 'util.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
-        #if 'agents/agent.py' in filepath:
-        #    summarize_file(filepath, llm, descriptions)
-        #if i > 3:
-        #    break
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:

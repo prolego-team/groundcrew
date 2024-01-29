@@ -11,8 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import (AssistantMessage, SystemMessage,
-                                      UserMessage)
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage, Message
 
 
 class Agent:
@@ -45,7 +44,7 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages = [SystemMessage(sp.AGENT_PROMPT)]
+        self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -110,6 +109,8 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
+            if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
+                break
 
             self.interact(user_prompt)
 
@@ -135,9 +136,26 @@ class Agent:
 
         self.run()
 
+    def interact_functional(self, user_prompt: str) -> str:
+        """
+        Process a user prompt and call dispatch
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            the system's response
+        """
+        self.messages.append(UserMessage(user_prompt))
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
+        response = self.dispatch(user_prompt)
+        self.messages.append(AssistantMessage(response))
+        spinner.stop()
+        self.print(response, 'agent')
+        return response
+
     def dispatch(self, user_prompt: str) -> str:
         """
-        Analyze the user's input and and either respond or choose an appropriate
+        Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
         the tool will be returned as the response.
 
