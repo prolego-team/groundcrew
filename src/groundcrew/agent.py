@@ -12,7 +12,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage, Message
 
 
 class Agent:
@@ -178,15 +178,20 @@ class Agent:
             the system's response
         """
         self.messages.append(UserMessage(user_prompt))
-        spinner = yaspin(text='Thinking...', color='green')
-        spinner.start()
-        response = self.dispatch(user_prompt)
-        self.messages.append(AssistantMessage(response))
-        spinner.stop()
-        self.print(response, 'agent')
-        return response
 
-    def dispatch(self, user_prompt: str) -> str:
+        # spinner = yaspin(text='Thinking...', color='green')
+        # spinner.start()
+
+        self.dispatch(user_prompt)
+        self.messages.extend(self.dispatch_messages[1:])
+
+        # spinner.stop()
+
+        content = self.messages[-1].content
+        self.print(content, 'agent')
+        return content
+
+    def dispatch(self, user_prompt: str) -> None:
         """
         Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
@@ -207,22 +212,22 @@ class Agent:
         for tool in self.tools.values():
             system_prompt += tool.to_yaml() + '\n\n'
 
-        self.dispatch_messages = [SystemMessage(system_prompt)]
+        self.dispatch_messages = [SystemMessage(system_prompt)] + self.messages
 
         user_question = '\n\n### Question ###\n' + user_prompt
         self.dispatch_messages.append(UserMessage(user_question))
 
         while True:
 
-            self.spinner = yaspin(text='Thinking...', color='green')
-            self.spinner.start()
+            # self.spinner = yaspin(text='Thinking...', color='green')
+            # self.spinner.start()
 
             # Choose tool or get a response
             select_tool_response = self.llm(self.dispatch_messages)
 
             # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
-            self.spinner.stop()
+            # self.spinner.stop()
 
             # Parse the tool selection response
             parsed_select_tool_response = autils.parse_response(
@@ -234,15 +239,15 @@ class Agent:
             if 'Tool' not in parsed_select_tool_response:
                 break
 
-            self.spinner = yaspin(
-                text='Running ' + parsed_select_tool_response['Tool'],
-                color='green'
-            )
-            self.spinner.start()
+            # self.spinner = yaspin(
+            #     text='Running ' + parsed_select_tool_response['Tool'],
+            #     color='green'
+            # )
+            # self.spinner.start()
 
             # Run Tool
             tool_response = self.run_tool(parsed_select_tool_response)
-            self.spinner.stop()
+            # self.spinner.stop()
 
             tool_response_message = 'Tool response\n' + tool_response
             tool_response_message += user_question + '\n\n'

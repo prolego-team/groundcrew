@@ -168,7 +168,9 @@ def run_suite(
 
                 answer = tool(**tool_params)
             except Exception as e:
+                import traceback
                 print('exception while running tool:', e)
+                print(traceback.format_exc())
                 answer = None
 
             end_time = time.time()
