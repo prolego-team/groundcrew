@@ -104,7 +104,7 @@ def build_llm_completion_client(
                 ]
                 response = completion(messages)
                 return response.content
-            except:
+            except Exception:
                 return ''
 
     return chat_complete
