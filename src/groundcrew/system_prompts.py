@@ -25,23 +25,25 @@ Your task is to generate a concise summary of the above Python code. Keep your s
     - Relevant information from comments and docstrings
 """
 
-CHOOSE_TOOL_PROMPT = """Your task is to either (1) respond directly to the user's question or (2) choose the correct tool and parameters to answer the following question. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. Do not engage in any conversation. Your answer must be in one of the following two formats.
+CHOOSE_TOOL_PROMPT = """Your task is to address a question or command from a user in the Question seciton. You will do this in a step by step manner by choosing a single Tool and parameters necessary for this task. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. When you have the necessary data to complete your task, respond directly to the user with a summary of the steps taken. Do not ask the user for filepaths or filenames. You must use the tools available to you. Your answer must be in one of the following two formats.
 
-(1) If you are responding directly to the user's questions, use this format:
+(1) If you are choosing the correct Tool and parameters, use the following format. Do not use references to parameter values, you must put the value being passed in the Parameter value section. If passing in code, do not include backticks.
+Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
+Tool: Tool Name
+Tool query: Provide a query to the Tool to get the answer to the question.
+Parameter_0: Parameter_0 Name | Parameter value | parameter type
+...
+Parameter_N: Parameter_N Name | Parameter value | parameter type
+
+(2) If you are responding directly to the user's questions, use this format:
 Response: Write your response here. Your response should be limited to 3 sentences or less. If you include code in your response, it should be in a code block like this:
 ```python
 # Code goes here
 ```
-
-(2) If you are choosing the correct tool and parameters, use this format:
-Reason: Describe your reasoning for why this tool was chosen in 3 sentences or less.
-Tool: Tool Name
-Tool query: Provide a query to the tool to get the answer to the question.
-Parameter_0: Parameter_0 Name | Variable value | parameter type
-...
-Parameter_N: Parameter_N Name | Variable value | parameter type
-
 """
+
+# TODO: Might be able to optimize this a bit more
+TOOL_RESPONSE_PROMPT = 'If you can answer the complete question do so, otherwise choose a Tool.'
 
 CODEQA_PROMPT = "Your answer should only include information that pertains to the question."
 
@@ -87,3 +89,4 @@ class ToolExample(Tool):
         type: str
         required: true
 """
+
