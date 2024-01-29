@@ -230,7 +230,7 @@ def setup_tools(
 
                 tool_err = f'Tool {tool_obj} must return a string'
                 assert inspect.signature(
-                    tool_obj).return_annotation == str, tool_err
+                    tool_obj).return_annotation is str, tool_err
 
                 # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
