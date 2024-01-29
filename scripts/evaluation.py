@@ -44,6 +44,8 @@ def main(
 
     # ~~~~ create output directory
 
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     output_dir_path = f'{output_dir_prefix}_{timestamp}'
     os.makedirs(output_dir_path, exist_ok=False)
