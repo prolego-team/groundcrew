@@ -177,7 +177,6 @@ class Agent:
         Returns:
             the system's response
         """
-        self.messages.append(UserMessage(user_prompt))
 
         # spinner = yaspin(text='Thinking...', color='green')
         # spinner.start()
