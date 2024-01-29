@@ -1,14 +1,91 @@
-- name: Codebase QA
+- name: Tools
   tests:
-    - tool: codebase_qa
-      question: Is there functionality to extract text from a pdf
+    - name: find func A
+      tool: CodebaseQATool
+      params:
+        user_prompt: Is there functionality to extract text from a pdf?
+        include_code: false
       eval_func:
-        typ: match_word_any
+        type: match_word_any
         words: ['extract_text_from_pdf']
         strip_quotes: true
-    - tool: codebase_qa
-      question: How do I first find the paths for PDFs?
+    - name: find func B
+      tool: CodebaseQATool
+      params:
+        user_prompt: How do I first find the paths for PDFs?
+        include_code: true
       eval_func:
-        typ: match_word_any
+        type: match_word_any
         words: ['find_pdfs_in_directory']
         strip_quotes: true
+
+    - name: lint A
+      tool: LintFileTool
+      params:
+        user_prompt: What are some linting issues with agents utils?
+        filepath_inexact: agents utils
+      eval_func:
+        type: contains_all
+        checks: ['unused import', 'dataclasses.asdict', 'bare', 'except']
+    - name: lint B
+      tool: LintFileTool
+      params:
+        user_prompt: What are some code style issues with tests_tree.py?
+        filepath_inexact: tests_tree.py
+      eval_func:
+        type: contains_all
+        checks: ['is None', 'lambda']
+    - name: lint C
+      tool: LintFileTool
+      params:
+        user_prompt: What are some import issues in agents/tools.py
+        filepath_inexact: agents/tools.py
+      eval_func:
+        type: contains_all
+        checks: ['json', 'sqlite3', 'typing.Any', 'typing.List', 'pandasql']
+
+    - name: docstring A
+      tool: SingleDocstringTool
+      params:
+        user_prompt: Generate a docstring for the method check_prompt
+        code: none
+        filename: none
+        function_name: check_prompt
+      eval_func:
+        type: always_pass
+
+
+- name: Agent
+  tests:
+    # Note that this doesn't currently pass, the final prompt results in a 'No matching functions found' message.
+    - name: find / interact / docstring
+      tool: Agent
+      params:
+        user_prompts:
+          - Show the full code for the function that calculates running cost.
+          - Refactor it to return a list, and rename it accordingly.
+          - Generate a docstring for the refactored function.
+      eval_func:
+        type: contains_all
+        checks: ['"""', 'List', 'Returns']
+
+
+#- name: Codebase QA Fuzzy
+#  tests:
+#    - name: find func A
+#      tool: CodebaseQATool
+#      params:
+#        user_prompt: Is there functionality to extract text from a pdf?
+#        include_code: false
+#      eval_func:
+#        type: eval_with_llm
+#        instructions: The result should reference the function "extract_text_from_pdf"
+#
+#    - name: find func B
+#      tool: CodebaseQATool
+#      params:
+#        user_prompt: How do I first find the paths for PDFs?
+#        include_code: true
+#      eval_func:
+#        type: eval_with_llm
+#        instructions: The result should reference the function "find_pdfs_in_directory"

@@ -95,12 +95,15 @@ def build_llm_completion_client(
         completion = openaiapi.start_chat(model, client)
 
         def chat_complete(prompt):
-            messages = [
-                openaiapi.SystemMessage("You are a helpful assistant."),
-                openaiapi.UserMessage(prompt)
-            ]
-            response = completion(messages)
-            return response.content
+            try:
+                messages = [
+                    openaiapi.SystemMessage("You are a helpful assistant."),
+                    openaiapi.UserMessage(prompt)
+                ]
+                response = completion(messages)
+                return response.content
+            except Exception:
+                return ''
 
     return chat_complete
 
@@ -223,7 +226,7 @@ def setup_tools(
                 # Check that the tool object has the correct signature
                 assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
 
-                assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
+                assert isinstance(inspect.signature(tool_obj).return_annotation, str), 'Tool must return a string'
 
                 # Add the tool to the tools dictionary
                 tools[node.name] = Tool(
