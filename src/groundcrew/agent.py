@@ -7,6 +7,7 @@ import readline
 from typing import Any, Callable
 
 from yaspin import yaspin
+from yaspin.core import Yaspin
 from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
@@ -45,6 +46,7 @@ class Agent:
         self.llm = chat_llm
         self.tools = tools
         self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
+        self.spinner: Yaspin | None = None
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -197,7 +199,8 @@ class Agent:
             None
         """
 
-        self.spinner.stop()
+        if self.spinner is not None:
+            self.spinner.stop()
 
         system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
         system_prompt += '### Tools ###\n'
