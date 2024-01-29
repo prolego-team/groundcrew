@@ -42,6 +42,9 @@ Response: Write your response here. Your response should be limited to 3 sentenc
 ```
 """
 
+# TODO: Might be able to optimize this a bit more
+TOOL_RESPONSE_PROMPT = 'If you can answer the complete question do so, otherwise choose a Tool.'
+
 CODEQA_PROMPT = "Your answer should only include information that pertains to the question."
 
 TOOL_GPT_PROMPT = """Your task is to take as input a Python `Tool` class and create a description of the `__call__` method in YAML format like the example below. All `Tools` will include a `user_prompt` parameter in the `__call__` method.
@@ -87,4 +90,3 @@ class ToolExample(Tool):
         required: true
 """
 
-_CHOOSE_TOOL_PROMPT = """Your task is to address a question or command from a user in the ### Question ### seciton. You will do this in a step by step manner by choosing the correct Tool and parameters necessary for this task. The previous Tools used and their results are available to you in the ### Previous Steps ### section. If the ### Previous Steps ### sections is empty, generate a short step by step plan for how you plan to complete the task. Be sure to ask the user for confirmation of your plan, and revise your plan as needed. Only include "Tool:" in your answer if you are choosing a valid Tool available to you. When you have the necessary data to complete your task, respond directly to the user with a summary of the steps taken. Your answer must be in one of the following two formats."""

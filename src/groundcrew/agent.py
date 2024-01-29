@@ -122,7 +122,17 @@ class Agent:
 
             self.interact(user_prompt)
 
-    def run_tool(self, parsed_response):
+    def run_tool(self, parsed_response: dict[str, str | list[str]]) -> str:
+        """
+        Runs the Tool selected by the LLM.
+
+        Args:
+            parsed_response (Dict): A dictionary containing the parsed data
+            from LLM.
+
+        Returns:
+            tool_response (str): The response from the tool.
+        """
 
         tool_selection = parsed_response['Tool']
         if tool_selection not in self.tools:
@@ -155,8 +165,15 @@ class Agent:
 
         return tool.obj(parsed_response['Tool query'], **tool_args)
 
-    def dispatch(self, user_prompt: str) -> str:
+    def dispatch(self, user_prompt: str) -> None:
         """
+        Send user_prompt to LLM to either select a tool or respond directly.
+
+        Args:
+            user_prompt (str): The user's input or question.
+
+        Returns:
+            None
         """
 
         self.spinner.stop()
@@ -203,9 +220,10 @@ class Agent:
             tool_response = self.run_tool(parsed_select_tool_response)
             self.spinner.stop()
 
-            self.dispatch_messages.append(
-                UserMessage('Tool response\n' + tool_response + user_question + '\n\nIf you can answer the complete question do so, otherwise choose a Tool.')
-            )
+            tool_response_message = 'Tool response\n' + tool_response
+            tool_response_message += user_question + '\n\n'
+            tool_response_message += sp.TOOL_RESPONSE_PROMPT
+            self.dispatch_messages.append(UserMessage(tool_response_message))
 
     def extract_params(
             self,
