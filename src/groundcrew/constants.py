@@ -8,5 +8,4 @@ DEFAULT_EF = embedding_functions.DefaultEmbeddingFunction()
 
 DEFAULT_COLLECTION_NAME = 'database'
 
-CLASS_NODE_TYPE = ast.ClassDef
-FUNCTION_NODE_TYPE = ast.FunctionDef
+DEFAULT_MODEL = 'gpt-4-0125-preview'

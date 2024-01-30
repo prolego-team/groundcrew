@@ -3,47 +3,72 @@
 """
 
 
-def parse_response(
-        text: str,
-        keywords: list[str]
-    ) -> dict[str, str | list[str]]:
+def parse_response(text: str, keywords: list[str]) -> dict[str, str | list[str]]:
     """
-    Parse an LLM response with sections including Reason:, Tool: and numbered
-    Parameter_N lines into a dictionary of section lines
+    Parse the first LLM response in a text with sections including Reason:, Tool: and numbered
+    Parameter_N lines into a dictionary of section lines. Ignores any subsequent responses
+    and handles accidental newlines.
 
     Args:
-        text (str): The text to be parsed.
+        text (str): The text to be parsed, potentially containing multiple responses.
         keywords (list[str]): A list of keywords to look for in the text.
 
     Returns:
-        dict: A dictionary representation of the parsed text.
+        dict: A dictionary representation of the parsed text for the first response.
     """
+
+    if '```python' in text:
+        text = text.replace('```python', '').replace('```', '')
 
     # Split the text into lines
     lines = text.split('\n')
 
     parsed_dict = {}
+    current_keyword = None
+    current_value = []
+    response_started = False
+    tool_encountered = False
+
     for line in lines:
 
-        line_start = line.split(': ', 1)[0]
+        # Check for the start of a new tool section
+        if line.startswith('Tool:'):
 
-        current_keyword = None
-        if line_start in keywords or line_start.startswith('Parameter_'):
-            current_keyword = line_start
-            line = ''.join(line.split(current_keyword + ': ')[1:])
+            # If a new tool section is found after the first one, stop parsing
+            if tool_encountered:
+                break
 
-        if current_keyword is not None:
-            values = parsed_dict.setdefault(current_keyword, [])
-            values.append(line)
+            tool_encountered = True
 
+        if any(line.startswith(keyword + ":") for keyword in keywords) or line.startswith('Parameter_'):
+            response_started = True
+
+            # If there is an ongoing section, save it before starting a new one
+            if current_keyword is not None and line.split(': ', 1)[0] != current_keyword:
+                parsed_dict[current_keyword] = '\n'.join(current_value)
+                current_value = []
+
+            # Update the current section keyword
+            current_keyword = line.split(': ', 1)[0]
+
+        # Append line to current section value
+        if current_keyword is not None and response_started:
+            content = line.replace(current_keyword + ': ', '', 1)
+            if content:  # Avoid adding empty lines
+                current_value.append(content)
+
+    # Add the last section to the dictionary
+    if current_keyword is not None:
+        parsed_dict[current_keyword] = '\n'.join(current_value)
+
+    # Process Parameter_N values
     result_dict = {}
-    for keyword, keyword_lines in parsed_dict.items():
-
-        keyword_value = '\n'.join(keyword_lines)
-
+    for keyword, value in parsed_dict.items():
         if keyword.startswith('Parameter_'):
-            keyword_value = keyword_value.split(' | ')
-
-        result_dict[keyword] = keyword_value
+            sections = value.split(' | ')
+            result_dict[keyword] = sections
+        else:
+            result_dict[keyword] = value
 
     return result_dict
+

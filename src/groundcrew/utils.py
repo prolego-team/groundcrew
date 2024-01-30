@@ -17,10 +17,10 @@ from pygments import highlight
 from pygments.lexers import PythonLexer
 from pygments.formatters import Terminal256Formatter
 
-from groundcrew import system_prompts as sp
-from groundcrew.dataclasses import Tool
+from groundcrew import constants, system_prompts as sp
 from groundcrew.llm import openaiapi
 from groundcrew.llm.openaiapi import Message
+from groundcrew.dataclasses import Tool
 
 
 def highlight_code_helper(text: str, colorscheme: str) -> str:
@@ -74,33 +74,36 @@ def highlight_code(text: str, colorscheme: str) -> str:
     return out
 
 
-def build_llm_chat_client(model: str = sp.DEFAULT_MODEL) -> Callable[[list[Message]], str]:
+def build_llm_chat_client(
+        model: str = constants.DEFAULT_MODEL) -> Callable[[list[Message]], str]:
     """Make an LLM client that accepts a list of messages and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()
         chat_session = openaiapi.start_chat(model, client)
 
-        def chat(messages: list[Message]) -> str:
-            response = chat_session(messages)
-            messages.append(response)
-            return response.content
+        def chat(messages: list[Message]) -> Message:
+            return chat_session(messages)
 
     return chat
 
 
-def build_llm_completion_client(model: str = sp.DEFAULT_MODEL) -> Callable[[str], str]:
+def build_llm_completion_client(
+        model: str = constants.DEFAULT_MODEL) -> Callable[[str], str]:
     """Make an LLM client that accepts a string prompt and returns a response."""
     if 'gpt' in model:
         client = openaiapi.get_openaiai_client()
         completion = openaiapi.start_chat(model, client)
 
         def chat_complete(prompt):
-            messages = [
-                openaiapi.SystemMessage("You are a helpful assistant."),
-                openaiapi.UserMessage(prompt)
-            ]
-            response = completion(messages)
-            return response.content
+            try:
+                messages = [
+                    openaiapi.SystemMessage("You are a helpful assistant."),
+                    openaiapi.UserMessage(prompt)
+                ]
+                response = completion(messages)
+                return response.content
+            except Exception:
+                return ''
 
     return chat_complete
 
@@ -202,6 +205,11 @@ def setup_tools(
                 if isinstance(tool_info_dict, list):
                     tool_info_dict = tool_info_dict[0]
 
+                # Remove the user_prompt from the params in case the LLM added
+                # it
+                if 'user_prompt' in tool_info_dict['params']:
+                    del tool_info_dict['params']['user_prompt']
+
                 params['base_prompt'] = tool_info_dict['base_prompt']
 
                 tool_constructor = getattr(module, node.name)
@@ -216,9 +224,13 @@ def setup_tools(
                 tool_obj = tool_constructor(**args)
 
                 # Check that the tool object has the correct signature
-                assert 'user_prompt' in inspect.signature(tool_obj).parameters, 'Tool must have a user_prompt parameter'
+                tool_err = 'Tool must have a user_prompt parameter'
+                assert 'user_prompt' in inspect.signature(
+                    tool_obj).parameters, tool_err
 
-                assert inspect.signature(tool_obj).return_annotation == str, 'Tool must return a string'
+                tool_err = f'Tool {tool_obj} must return a string'
+                assert inspect.signature(
+                    tool_obj).return_annotation is str, tool_err
 
                 # Add the tool to the tools dictionary
                 tools[node.name] = Tool(

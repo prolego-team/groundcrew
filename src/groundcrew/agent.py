@@ -11,7 +11,7 @@ from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage
 
 
 class Agent:
@@ -44,7 +44,7 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages = [SystemMessage(sp.AGENT_PROMPT)]
+        self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -66,7 +66,34 @@ class Agent:
         print(self.colors[role])
         print(f'[{role}]')
         print(Colors.ENDC)
-        print(text)
+        print(utils.highlight_code(text, self.config.colorscheme))
+
+    def interact(self, user_prompt: str) -> None:
+        """
+        Process a user prompt and call dispatch
+
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            None
+        """
+
+        if not self.config.debug:
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
+
+        self.dispatch(user_prompt)
+
+        # Append dispatch messages except for the system prompt
+        self.messages.extend(self.dispatch_messages[1:])
+
+        if self.config.debug:
+            self.print_message_history(self.messages)
+        else:
+            self.spinner.stop()
+
+        # Response with the last message from the agent
+        self.print(self.messages[-1].content, 'agent')
 
     def run(self):
         """
@@ -92,21 +119,74 @@ class Agent:
                         line = input('')
 
             user_prompt = user_prompt.replace('\\code', '')
-            self.messages.append(UserMessage(user_prompt))
+            if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
+                break
 
-            spinner = yaspin(text='Thinking...', color='green')
-            spinner.start()
-            response = self.dispatch(user_prompt)
-            self.messages.append(AssistantMessage(response))
-            spinner.stop()
+            self.interact(user_prompt)
 
-            # TODO - handle params that should be there but are not
+    def run_tool(self, parsed_response: dict[str, str | list[str]]) -> str:
+        """
+        Runs the Tool selected by the LLM.
 
-            self.print(response, 'agent')
+        Args:
+            parsed_response (Dict): A dictionary containing the parsed data
+            from LLM.
+
+        Returns:
+            tool_response (str): The response from the tool.
+        """
+
+        tool_selection = parsed_response['Tool']
+        if tool_selection not in self.tools:
+            return 'The LLM tried to call a function that does not exist.'
+
+        tool = self.tools[tool_selection]
+        tool_args = self.extract_params(parsed_response)
+
+        expected_tool_args = inspect.signature(tool.obj).parameters
+
+        # Filter out incorrect parameters
+        new_args = {}
+        for param_name, val in tool_args.items():
+            if param_name in expected_tool_args:
+                new_args[param_name] = val
+        tool_args = new_args
+
+        # Add any missing parameters - default to None for now.
+        # In the future we'll probably want the LLM to regenerate params
+        for param_name in expected_tool_args.keys():
+            if param_name == 'user_prompt':
+                continue
+            if param_name not in tool_args:
+                tool_args[param_name] = None
+
+        if self.config.debug:
+            print(f'Please standby while I run the tool {tool.name}...')
+            print(f'("{parsed_response["Tool query"]}", {tool_args})')
+            print()
+
+        return tool.obj(parsed_response['Tool query'], **tool_args)
+
+    def interact_functional(self, user_prompt: str) -> str:
+        """
+        Process a user prompt and call dispatch
+        Args:
+            user_prompt (str): The user's input or question.
+        Returns:
+            the system's response
+        """
+        self.messages.append(UserMessage(user_prompt))
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
+        response = self.dispatch(user_prompt)
+        self.messages.append(AssistantMessage(response))
+        spinner.stop()
+        self.print(response, 'agent')
+        return response
 
     def dispatch(self, user_prompt: str) -> str:
         """
-        Analyze the user's input and and either respond or choose an appropriate
+        Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
         the tool will be returned as the response.
 
@@ -114,66 +194,57 @@ class Agent:
             user_prompt (str): The user's input or question.
 
         Returns:
-            str: The response from the tool or LLM.
+            None
         """
 
-        dispatch_prompt = '### Tools ###\n'
+        self.spinner.stop()
+
+        system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        system_prompt += '### Tools ###\n'
         for tool in self.tools.values():
-            dispatch_prompt += tool.to_yaml() + '\n\n'
+            system_prompt += tool.to_yaml() + '\n\n'
 
-        dispatch_prompt += '### Question ###\n'
-        dispatch_prompt += user_prompt + '\n\n'
+        self.dispatch_messages = [SystemMessage(system_prompt)]
 
-        # Put instructions at the end of the prompt
-        dispatch_prompt += sp.CHOOSE_TOOL_PROMPT
+        user_question = '\n\n### Question ###\n' + user_prompt
+        self.dispatch_messages.append(UserMessage(user_question))
 
-        dispatch_messages = self.messages + [UserMessage(dispatch_prompt)]
-        dispatch_response = self.llm(dispatch_messages)
+        while True:
 
-        if self.config.debug:
-            print(Colors.MAGENTA)
-            print(dispatch_prompt, Colors.ENDC, '\n')
-            print(Colors.GREEN)
-            print(dispatch_response, Colors.ENDC)
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
 
-        parsed_response = autils.parse_response(
-            dispatch_response,
-            keywords=['Response', 'Reason', 'Tool', 'Tool query']
-        )
+            # Choose tool or get a response
+            select_tool_response = self.llm(self.dispatch_messages)
 
-        if 'Tool' in parsed_response:
-            tool_selection = parsed_response['Tool']
-            if tool_selection not in self.tools:
-                return 'The LLM tried to call a function that does not exist.'
+            # Add response to the dispatch messages as an assistant message
+            self.dispatch_messages.append(select_tool_response)
+            self.spinner.stop()
 
-            tool = self.tools[tool_selection]
-            tool_args = self.extract_params(parsed_response)
-
-            expected_tool_args = inspect.signature(tool.obj).parameters
-
-            # Filter out incorrect parameters
-            new_args = {}
-            for param_name, val in tool_args.items():
-                if param_name in expected_tool_args:
-                    new_args[param_name] = val
-            tool_args = new_args
-
-            if self.config.debug:
-                print(f'Please standby while I run the tool {tool.name}...')
-                print(f'("{parsed_response["Tool query"]}", {tool_args})')
-                print()
-            response = utils.highlight_code(
-                tool.obj(parsed_response['Tool query'], **tool_args),
-                self.config.colorscheme
+            # Parse the tool selection response
+            parsed_select_tool_response = autils.parse_response(
+                select_tool_response.content,
+                keywords=['Response', 'Reason', 'Tool', 'Tool query']
             )
 
-        else:
-            response = utils.highlight_code(
-                dispatch_response,
-                self.config.colorscheme
-            )
+            # No Tool selected - this should be an answer
+            if 'Tool' not in parsed_select_tool_response:
+                break
 
-        return response
+            self.spinner = yaspin(
+                text='Running ' + parsed_select_tool_response['Tool'],
+                color='green'
+            )
+            self.spinner.start()
+
+            # Run Tool
+            tool_response = self.run_tool(parsed_select_tool_response)
+            self.spinner.stop()
+
+            tool_response_message = 'Tool response\n' + tool_response
+            tool_response_message += user_question + '\n\n'
+            tool_response_message += sp.TOOL_RESPONSE_PROMPT
+            self.dispatch_messages.append(UserMessage(tool_response_message))
 
     def extract_params(
             self,
@@ -222,3 +293,41 @@ class Agent:
                 args[param_name.replace(' ', '')] = param_value
 
         return args
+
+    def run_with_prompts(self, prompts: list[str]):
+        """
+        Process a list of user prompts and respond using the chosen tool
+        based on the input.
+
+        Args:
+            prompts (List[str]): List of prompts to be processed by the agent.
+        """
+        for i, user_prompt in enumerate(prompts):
+
+            if i == 0:
+                self.print(user_prompt, 'user')
+
+            self.interact(user_prompt)
+
+            if i < len(prompts) - 1:
+                print('Next prompt:')
+                self.print(prompts[i + 1], 'user')
+                input('\nPress enter to continue...\n')
+
+        self.run()
+
+    def print_message_history(self, messages):
+        print('\n', '*' * 50, '\n')
+        for message in messages:
+            if message.role == 'user':
+                color = Colors.GREEN
+            elif message.role == 'system':
+                color = Colors.RED
+            elif message.role == 'assistant':
+                color = Colors.BLUE
+
+            print('Role:', message.role)
+            print(color)
+            print(message.content)
+            print(Colors.ENDC)
+        print('\n', '*' * 50, '\n')
