@@ -38,7 +38,7 @@
     - name: lint C
       tool: LintFileTool
       params:
-        user_prompt: What are some import issues in agents/tools.py
+        user_prompt: What are some import issues in agents/tools.pyç
         filepath_inexact: agents/tools.py
       eval_func:
         type: contains_all
@@ -68,7 +68,14 @@
       eval_func:
         type: contains_all
         checks: ['"""', 'List', 'Returns']
-
+    - name: tool chaining
+      tool: Agent
+      params:
+        user_prompts:
+          - Find the method that calculates the running cost, then run the linting tool on the file it's in.
+      eval_func:
+        type: contains_all
+        checks: ['src/neosophia/agents/agent.py', 'unused', 'import', 'variables']
 
 #- name: Codebase QA Fuzzy
 #  tests:
