@@ -12,6 +12,7 @@ import sys
 import chromadb
 import click
 import git
+import pickle
 import tqdm
 import yaml
 
@@ -43,9 +44,13 @@ def main(
 
     # ~~~~ create output directory
 
+    os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     output_dir_path = f'{output_dir_prefix}_{timestamp}'
     os.makedirs(output_dir_path, exist_ok=False)
+
+    output_file_prefix = 'eval'
 
     # ~~~~ load a single system (for now) that we will evaluate
 
@@ -90,9 +95,14 @@ def main(
         )
         results = {**results, **results_suite}
 
+    # ~~~~ save result pickle
+
+    output_file_path = os.path.join(output_dir_path, f'{output_file_prefix}.pkl')
+    with open(output_file_path, 'wb') as f:
+        pickle.dump(results, f)
+
     # ~~~~ save result CSV
 
-    output_file_prefix = 'eval'
     output_file_path = os.path.join(output_dir_path, f'{output_file_prefix}.csv')
     # header = 'suite,question,run,calls,time,missing,correct,answer\n'
     header = 'suite,test,run,time,missing,correct,answer\n'
@@ -158,7 +168,9 @@ def run_suite(
 
                 answer = tool(**tool_params)
             except Exception as e:
+                import traceback
                 print('exception while running tool:', e)
+                print(traceback.format_exc())
                 answer = None
 
             end_time = time.time()

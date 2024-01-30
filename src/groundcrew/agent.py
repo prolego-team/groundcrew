@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from yaspin.core import Yaspin
 from yaspin import yaspin
+from yaspin.core import Yaspin
 from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
