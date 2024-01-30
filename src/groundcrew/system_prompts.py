@@ -89,4 +89,3 @@ class ToolExample(Tool):
         type: str
         required: true
 """
-

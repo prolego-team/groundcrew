@@ -71,7 +71,7 @@ def extract_python_from_file(file_text, node_types):
             }
 
         def visit_ClassDef(self, node):
-            if ast.ClassDef  == node_types:
+            if ast.ClassDef == node_types:
                 self.update_texts(node, node.name)
             self.current_class = node.name
             self.generic_visit(node)
@@ -108,7 +108,7 @@ def find_object_use(
 
         function_calls = [
             (line_no, line.strip())
-            for line_no,line in enumerate(file_text.split('\n'))
+            for line_no, line in enumerate(file_text.split('\n'))
             if function_call in line and 'import' not in line
         ]
         if len(function_calls) > 0:

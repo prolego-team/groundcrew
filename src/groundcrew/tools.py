@@ -6,7 +6,6 @@ import subprocess
 
 from typing import Callable
 
-from chromadb.api.models.Collection import Collection
 from thefuzz import process as fuzzprocess
 from chromadb import Collection
 
@@ -15,7 +14,7 @@ from groundcrew.dataclasses import Chunk
 
 
 def query_codebase(
-        prompt: str, collection: Collection, n_results: int=5, where: dict=None):
+        prompt: str, collection: Collection, n_results: int = 5, where: dict = None):
     """
     Queries the codebase for relevant code chunks based on a given prompt.
 
@@ -608,7 +607,7 @@ class GetFileContentsTool:
 
         items = self.collection.get(
             include=['metadatas'],
-            where = {'filepath': filepath}
+            where={'filepath': filepath}
         )
 
         output = (
@@ -643,8 +642,6 @@ class InstallationAndUseTool:
         Args:
             user_prompt (str): The prompt to process.
         """
-
-
         query = (
             "What files contain documentation regarding the installation and "
             "use of the codebase? Include README, configuration and environment "
