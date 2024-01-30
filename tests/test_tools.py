@@ -3,8 +3,38 @@ Tests for tools.
 """
 import chromadb
 
-from groundcrew import constants
 from groundcrew import tools
+
+
+def test_get_python_files():
+    """tests for findusagetool"""
+
+    # in memory client for testing
+    client = chromadb.EphemeralClient()
+    collection = client.get_or_create_collection(
+        name='test_python_files'
+    )
+
+    metadatas = [
+        {'type': 'file', 'id': 'foo.py', 'filepath': 'foo.py', 'text': 'File 1'},
+        {'type': 'file', 'id': 'bar.py', 'filepath': 'bar.py', 'text': 'File 2'},
+        {'type': 'file', 'id': 'README.md', 'filepath': 'README.md', 'text': 'File 3'},
+        {'type': 'file', 'id': 'test.pyc', 'filepath': 'test.pyc', 'text': 'File 4'},
+        {'type': 'file', 'id': 'baz.py', 'filepath': 'baz.py', 'text': 'File 5'},
+    ]
+    ids = [metadata['id'] for metadata in metadatas]
+
+    collection.upsert(
+        ids=ids,
+        metadatas=metadatas,
+        documents=['fake file summaries'] * len(ids)
+    )
+
+    assert tools.get_python_files(collection) == {
+        'foo.py': 'File 1',
+        'bar.py': 'File 2',
+        'baz.py': 'File 5'
+    }
 
 
 def test_findusage_tool():
@@ -13,7 +43,7 @@ def test_findusage_tool():
     # in memory client for testing
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(
-        name='test'
+        name='test_findusage_tool'
     )
 
     ids = [
@@ -81,7 +111,7 @@ def test_complexity_tool():
     # in memory client for testing
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(
-        name='test'
+        name='test_complexity_tool'
     )
 
     code = (
@@ -174,7 +204,7 @@ def test_lintfiletool():
     # in memory client for testing
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(
-        name=constants.DEFAULT_COLLECTION_NAME
+        name='test_lintfiletool'
     )
 
     example_ids_metadatas = [
@@ -195,13 +225,13 @@ def test_lintfiletool():
     tool.working_dir_path = 'baloney'
 
     # test fuzzy matching
-    assert tool.fuzzy_match_file_path('bapples', 50) == 'src/apples.py'    # close
-    assert tool.fuzzy_match_file_path('oranges', 50) == 'src/oranges.py'   # exact
-    assert tool.fuzzy_match_file_path('baloney', 50) == 'src/bananas.py'   # far
-    assert tool.fuzzy_match_file_path('baloney', 75) is None
+    assert tools.fuzzy_match_file_path(collection, 'bapples', 50) == 'src/apples.py'    # close
+    assert tools.fuzzy_match_file_path(collection, 'oranges', 50) == 'src/oranges.py'   # exact
+    assert tools.fuzzy_match_file_path(collection, 'baloney', 50) == 'src/bananas.py'   # far
+    assert tools.fuzzy_match_file_path(collection, 'baloney', 75) is None
 
     # test getting filepaths from collection
-    assert tool.get_paths() == {
+    assert tools.get_paths(collection) == {
         '0': 'src/apples.py',
         '1': 'src/bananas.py',
         '2': 'src/oranges.py'
