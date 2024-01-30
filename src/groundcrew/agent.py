@@ -45,7 +45,7 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
+        self.messages: list[Message] = []
         self.spinner: Yaspin | None = None
 
         self.colors = {
@@ -87,7 +87,7 @@ class Agent:
         self.dispatch(user_prompt)
 
         # Append dispatch messages except for the system prompt
-        self.messages.extend(self.dispatch_messages[1:])
+        self.messages.extend(self.dispatch_messages)
 
         if self.config.debug:
             self.print_message_history(self.messages)
@@ -182,7 +182,7 @@ class Agent:
         # spinner.start()
 
         self.dispatch(user_prompt)
-        self.messages.extend(self.dispatch_messages[1:])
+        self.messages.extend(self.dispatch_messages)
 
         # spinner.stop()
 
@@ -206,12 +206,13 @@ class Agent:
         if self.spinner is not None:
             self.spinner.stop()
 
-        system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        system_prompt = sp.AGENT_PROMPT + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
         system_prompt += '### Tools ###\n'
         for tool in self.tools.values():
             system_prompt += tool.to_yaml() + '\n\n'
 
-        self.dispatch_messages = [SystemMessage(system_prompt)] + self.messages
+        # the message history involved in solving the current user_prompt
+        self.dispatch_messages = []
 
         user_question = '\n\n### Question ###\n' + user_prompt
         self.dispatch_messages.append(UserMessage(user_question))
@@ -222,7 +223,11 @@ class Agent:
             # self.spinner.start()
 
             # Choose tool or get a response
-            select_tool_response = self.llm(self.dispatch_messages)
+            select_tool_response = self.llm(
+                [SystemMessage(system_prompt)] +
+                self.messages +
+                self.dispatch_messages
+            )
 
             # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
