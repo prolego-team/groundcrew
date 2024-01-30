@@ -219,8 +219,8 @@ class Agent:
 
         while True:
 
-            # self.spinner = yaspin(text='Thinking...', color='green')
-            # self.spinner.start()
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
 
             # Choose tool or get a response
             select_tool_response = self.llm(
@@ -231,7 +231,7 @@ class Agent:
 
             # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
-            # self.spinner.stop()
+            self.spinner.stop()
 
             # Parse the tool selection response
             parsed_select_tool_response = autils.parse_response(
@@ -243,15 +243,15 @@ class Agent:
             if 'Tool' not in parsed_select_tool_response:
                 break
 
-            # self.spinner = yaspin(
-            #     text='Running ' + parsed_select_tool_response['Tool'],
-            #     color='green'
-            # )
-            # self.spinner.start()
+            self.spinner = yaspin(
+                text='Running ' + parsed_select_tool_response['Tool'],
+                color='green'
+            )
+            self.spinner.start()
 
             # Run Tool
             tool_response = self.run_tool(parsed_select_tool_response)
-            # self.spinner.stop()
+            self.spinner.stop()
 
             tool_response_message = 'Tool response\n' + tool_response
             tool_response_message += user_question + '\n\n'
