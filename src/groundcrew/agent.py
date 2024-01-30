@@ -3,16 +3,19 @@ Main agent class interacting with a user
 """
 import inspect
 import readline
+import subprocess
 
 from typing import Any, Callable
 
+from chromadb import Collection
+
 from yaspin import yaspin
 from yaspin.core import Yaspin
-from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage, Message
+from groundcrew.llm.openaiapi import (AssistantMessage, Message, SystemMessage,
+                                      UserMessage)
 
 
 class Agent:
@@ -47,12 +50,26 @@ class Agent:
         self.tools = tools
         self.messages: list[Message] = []
         self.spinner: Yaspin | None = None
+        self.shell_process = None
 
         self.colors = {
             'system': Colors.YELLOW,
             'user': Colors.GREEN,
             'agent': Colors.BLUE
         }
+
+    def run_shell_command(self, command):
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            shell=True,
+            executable=self.config.shell)
+
+        # Capture stdout and stderr
+        stdout, stderr = process.communicate()
+
+        return stdout.decode(), stderr.decode()
 
     def print(self, text: str, role: str) -> None:
         """
@@ -97,34 +114,102 @@ class Agent:
         # Response with the last message from the agent
         self.print(self.messages[-1].content, 'agent')
 
+    def start_shell_session(self):
+        if not self.shell_process:
+            self.shell_process = subprocess.Popen(
+                [self.config.shell],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1
+            )
+
+    def run_shell_command(self, command):
+        if self.shell_process:
+            # Send command to the shell process
+            self.shell_process.stdin.write(command + '\n')
+            self.shell_process.stdin.flush()
+            # Read command output
+            output = self.shell_process.stdout.readline()
+            return output, None
+        return '', 'Shell process not initialized.'
+
+    def stop_shell_session(self):
+        """
+        Terminate the shell process
+        """
+        if self.shell_process:
+            self.shell_process.terminate()
+            self.shell_process = None
+
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
         based on the input.
         """
+
+        self.shell_mode = False
+
         while True:
 
             user_prompt = ''
 
             while user_prompt == '':
-                user_prompt = input('[user] > ')
+
+                str_prompt = '[user] > '
+                if self.shell_mode:
+                    str_prompt = f'[{self.config.shell}] > '
+
+                user_prompt = input(str_prompt)
                 if '\\code' in user_prompt:
+                    code_mode = True
                     print(Colors.YELLOW)
                     print('Code mode activated — type \end to submit')
                     print(Colors.ENDC)
                     user_prompt += '\n'
-
                     line = input('')
-
                     while '\\end' not in line:
                         user_prompt += line + '\n'
                         line = input('')
 
+                elif '\\shell' in user_prompt and not self.shell_mode:
+                    self.shell_mode = True
+                    print(Colors.CYAN)
+                    print('Shell mode activated — type \exit to exit')
+                    print('Current shell:', self.config.shell)
+                    print('Current dir:', self.run_shell_command('pwd')[0])
+                    print(Colors.ENDC)
+                    self.start_shell_session()
+                    user_prompt = ''
+                    continue
+
+                elif '\\exit' in user_prompt:
+                    print(Colors.RED)
+                    print('Shell mode exited')
+                    print(Colors.ENDC)
+                    self.shell_mode = False
+                    self.stop_shell_session()
+                    continue
+
+            if self.shell_mode:
+                std_out, std_err = self.run_shell_command(user_prompt)
+                if std_out:
+                    print(Colors.GREEN)
+                    print(std_out)
+                    print(Colors.ENDC)
+                if std_err:
+                    print(Colors.RED)
+                    print(std_err)
+                    print(Colors.ENDC)
+
+            '''
             user_prompt = user_prompt.replace('\\code', '')
             if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
                 break
 
             self.interact(user_prompt)
+            '''
 
     def run_tool(self, parsed_response: dict[str, str | list[str]]) -> str:
         """
@@ -178,13 +263,13 @@ class Agent:
             the system's response
         """
 
-        # spinner = yaspin(text='Thinking...', color='green')
-        # spinner.start()
+        spinner = yaspin(text='Thinking...', color='green')
+        spinner.start()
 
         self.dispatch(user_prompt)
         self.messages.extend(self.dispatch_messages)
 
-        # spinner.stop()
+        spinner.stop()
 
         content = self.messages[-1].content
         self.print(content, 'agent')
@@ -219,8 +304,8 @@ class Agent:
 
         while True:
 
-            # self.spinner = yaspin(text='Thinking...', color='green')
-            # self.spinner.start()
+            self.spinner = yaspin(text='Thinking...', color='green')
+            self.spinner.start()
 
             # Choose tool or get a response
             select_tool_response = self.llm(
@@ -231,7 +316,7 @@ class Agent:
 
             # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
-            # self.spinner.stop()
+            self.spinner.stop()
 
             # Parse the tool selection response
             parsed_select_tool_response = autils.parse_response(
@@ -243,15 +328,15 @@ class Agent:
             if 'Tool' not in parsed_select_tool_response:
                 break
 
-            # self.spinner = yaspin(
-            #     text='Running ' + parsed_select_tool_response['Tool'],
-            #     color='green'
-            # )
-            # self.spinner.start()
+            self.spinner = yaspin(
+                text='Running ' + parsed_select_tool_response['Tool'],
+                color='green'
+            )
+            self.spinner.start()
 
             # Run Tool
             tool_response = self.run_tool(parsed_select_tool_response)
-            # self.spinner.stop()
+            self.spinner.stop()
 
             tool_response_message = 'Tool response\n' + tool_response
             tool_response_message += user_question + '\n\n'

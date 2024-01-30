@@ -19,6 +19,7 @@ class Config:
     Tools: [str]
     colorscheme: str
     debug: bool
+    shell: str
 
 
 @dataclass

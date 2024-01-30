@@ -10,3 +10,4 @@ Tools:
       - LintFileTool
 colorscheme: 'gruvbox-dark'
 debug: false
+shell: /bin/zsh
