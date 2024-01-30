@@ -218,10 +218,6 @@ def main(config: str, model: str, prompts_file: str | None):
         collection
     )
 
-    all_entries = collection.get(
-        include=['metadatas']
-    )
-
     # Load or generate Tools
     tools_filepath = opj(config.cache_dir, 'tools.yaml')
     tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
