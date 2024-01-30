@@ -222,12 +222,6 @@ def main(config: str, model: str, prompts_file: str | None):
         include=['metadatas']
     )
 
-    x = {
-        x: y
-        for x, y in zip(all_entries['ids'], all_entries['metadatas'])
-        if 'method' in x
-    }
-
     # Load or generate Tools
     tools_filepath = opj(config.cache_dir, 'tools.yaml')
     tool_descriptions = utils.setup_and_load_yaml(tools_filepath, 'tools')
@@ -239,12 +233,6 @@ def main(config: str, model: str, prompts_file: str | None):
         config.repository
     )
     utils.save_tools_to_yaml(tools, tools_filepath)
-
-    # while True:
-    #     ent = input('entity> ')
-    #     print(tools['FindUsageTool'].obj.get_usage(ent))
-
-    # exit()
 
     # The agent LLM is a chat LLM that takes a list of messages as input and
     # returns a message
