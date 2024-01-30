@@ -7,11 +7,12 @@ import readline
 from typing import Any, Callable
 
 from yaspin import yaspin
+from yaspin.core import Yaspin
 from chromadb import Collection
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import SystemMessage, UserMessage
+from groundcrew.llm.openaiapi import SystemMessage, UserMessage, AssistantMessage, Message
 
 
 class Agent:
@@ -44,7 +45,8 @@ class Agent:
         self.collection = collection
         self.llm = chat_llm
         self.tools = tools
-        self.messages: list[Message] = [SystemMessage(sp.AGENT_PROMPT)]
+        self.messages: list[Message] = []
+        self.spinner: Yaspin | None = None
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -85,7 +87,7 @@ class Agent:
         self.dispatch(user_prompt)
 
         # Append dispatch messages except for the system prompt
-        self.messages.extend(self.dispatch_messages[1:])
+        self.messages.extend(self.dispatch_messages)
 
         if self.config.debug:
             self.print_message_history(self.messages)
@@ -175,16 +177,20 @@ class Agent:
         Returns:
             the system's response
         """
-        self.messages.append(UserMessage(user_prompt))
-        spinner = yaspin(text='Thinking...', color='green')
-        spinner.start()
-        response = self.dispatch(user_prompt)
-        self.messages.append(AssistantMessage(response))
-        spinner.stop()
-        self.print(response, 'agent')
-        return response
 
-    def dispatch(self, user_prompt: str) -> str:
+        # spinner = yaspin(text='Thinking...', color='green')
+        # spinner.start()
+
+        self.dispatch(user_prompt)
+        self.messages.extend(self.dispatch_messages)
+
+        # spinner.stop()
+
+        content = self.messages[-1].content
+        self.print(content, 'agent')
+        return content
+
+    def dispatch(self, user_prompt: str) -> None:
         """
         Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
@@ -197,14 +203,16 @@ class Agent:
             None
         """
 
-        self.spinner.stop()
+        if self.spinner is not None:
+            self.spinner.stop()
 
-        system_prompt = sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        system_prompt = sp.AGENT_PROMPT + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
         system_prompt += '### Tools ###\n'
         for tool in self.tools.values():
             system_prompt += tool.to_yaml() + '\n\n'
 
-        self.dispatch_messages = [SystemMessage(system_prompt)]
+        # the message history involved in solving the current user_prompt
+        self.dispatch_messages = []
 
         user_question = '\n\n### Question ###\n' + user_prompt
         self.dispatch_messages.append(UserMessage(user_question))
@@ -215,7 +223,11 @@ class Agent:
             self.spinner.start()
 
             # Choose tool or get a response
-            select_tool_response = self.llm(self.dispatch_messages)
+            select_tool_response = self.llm(
+                [SystemMessage(system_prompt)] +
+                self.messages +
+                self.dispatch_messages
+            )
 
             # Add response to the dispatch messages as an assistant message
             self.dispatch_messages.append(select_tool_response)
