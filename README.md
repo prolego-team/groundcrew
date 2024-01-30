@@ -1,5 +1,7 @@
 # Groundcrew
+
 ## About
+
 Groundcrew is an LLM Retrieval Augmented Generation (RAG) solution for a code repository, or "chat with your code". Benefits:
 - improved code maintenance
 - better knowledge management and documentation
@@ -9,12 +11,37 @@ Groundcrew is an LLM Retrieval Augmented Generation (RAG) solution for a code re
 Groundcrew is a companion for code generation solutions like GitHub Copilot. Copilot helps you generate code, while Groundcrew reveals code insights.
 
 ## Using Groundcrew
+
 You can run Groundcrew against your code repository as described below. More importantly, you leverage the foundational interfaces and approach to build and maintain your own solution for improving developer efficiency.
 
-### Approach
->>> Something about summarizing code for the embeddigns, tools, etc.
+## Approach
+
+Groundcrew equips an "agent" (LLM) with access to an extensible set of "tools" that are used to answer user questions.  These two foundational components are described below.
+
+### Tools
+
+ Tools augment the LLM's capabilities, giving the LLM intentional and targeted functionality that minimizes generic responses and hallucinations. They also allow the user to structure the interactions with the LLM in a way that's useful for them.
+
+For example, if you show an LLM a Python script from a codebase and ask how to run it, the LLM will tend to answer generically. Create a virtual environment, install the dependencies then run the file with the Python interpreter, etc.  This is correct, but often unhelpful. Where are the dependencies located? What version of Python should you use? Did the developers even intend for you to run that file as a standalone script? In short, the LLM's canned response based on the source code has ignored other relevant context from the project's documentation and configuration files.
+
+Instead, we created an "Installation and Usage" tool that enables the LLM to search the codebase for documenation and setup files. Those specific pieces of information will in turn produce a much more useful to the user.
+
+Here are some other tools have been developed to give the LLM specific and efficient functionality:
+
+- A codebase question answering system that answers generic questions about the code, e.g., "What does function xyz do?";
+- A linting tool that will summarize poorly formatted code;
+- A docstring general tool for functions and classes;
+- A complexity analysis tool that will point the user to parts of the code that may need to be refactored;
+- A search capability to find the use of classes and functions across files.
+
+### The Agent
+
+Tool use is coordinated by an "agent" LLM that can choose which tool to use, call the tool, then respond to the user. An agent can call multiple tools in sequence if needed to answer the user's question. In short, the agent is the "interface" that the user interacts with.
+
+As you interact with the agent, all of the questions, tool calls and answers are kept in a working memory. This means you can ask the agent are series of questions in a conversational manner.
 
 ### More resources
+
 [Generative AI, Step-by-step]([url](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbJSkWVqZ2YWUCXrLeFPjV6)) - A YouTube playlist that presents each step in building Groundcrew starting with the idea. Contains demos and technical deep dives with the team.
 [LLM RAG fundamentals]([url](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbz78Z5QXsZhe9rHuCs1Jw-))
 
