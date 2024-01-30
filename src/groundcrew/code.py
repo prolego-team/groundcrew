@@ -6,7 +6,7 @@ import ast
 import tqdm
 from git import Repo
 
-from groundcrew.constants import DEFAULT_EF, CLASS_NODE_TYPE, FUNCTION_NODE_TYPE
+from groundcrew.constants import DEFAULT_EF
 from groundcrew.dataclasses import Chunk
 from groundcrew.code_utils import get_imports_from_code, import_called_as
 

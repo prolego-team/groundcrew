@@ -389,15 +389,48 @@ class CyclomaticComplexityTool:
         self.base_prompt = base_prompt
         self.min_max_complexity = min_max_complexity
 
-    def __call__(self, user_prompt: str, sort_on: str) -> str:
+    def __call__(
+            self,
+            user_prompt: str,
+            filepath_inexact: str = 'none',
+            sort_on: str = 'max'
+        ) -> str:
         """Answer questions using about the complex parts of a codebase.
         This method will create a summary of the most complex files to help answer
-        the question."""
+        the question.
+
+        Args:
+            user_prompt (str): The user's question.
+            filepath_inexact (str): A filepath explicitly requested by the user.  If the
+              user did not explicitly request a filepath, pass 'none'.
+            sort_on (str): Sort the results by the "average" or "max" complexity of the file.
+        """
+
+        if filepath_inexact != 'none':
+            filepath = fuzzy_match_file_path(self.collection, filepath_inexact, 50)
+
+            if filepath is None:
+                return f'Could not find a source file matching `{filepath_inexact}`'
+
+            all_items = self.collection.get(
+                include=['metadatas'],
+                where={'filepath': filepath}
+            )
+
+            files = {
+                id_: metadata['text']
+                for id_, metadata in zip(all_items['ids'], all_items['metadatas'])
+                if id_[-3:] == '.py'
+            }
+
+        else:
+            files = get_python_files(self.collection)
 
         sort_on = sort_on.lower()
-        assert sort_on in ['average', 'max'], 'sort_on must be "average" or "max"'
+        if sort_on not in ['average', 'max']:
+            return 'The sort_on parameter passed to CyclomaticComplexityTool must be "average" or "max".'
 
-        complexity_summary_str = self.complexity_analysis(sort_on)
+        complexity_summary_str = self.complexity_analysis(files, sort_on)
 
         prompt = (
             complexity_summary_str +
@@ -423,9 +456,8 @@ class CyclomaticComplexityTool:
             'details': complexity_dict
         }
 
-    def complexity_analysis(self, sort_on: str) -> tuple[list[str], dict]:
+    def complexity_analysis(self, files: dict[str, str], sort_on: str) -> tuple[list[str], dict]:
         """Analyze the complexity of the codebase."""
-        files = get_python_files(self.collection)
 
         file_complexity = {}
         current_max = 0
@@ -589,7 +621,8 @@ class GetFileContentsTool:
 
 class InstallationAndUseTool:
     """
-    Answer questions about the installation and use of the codebase.
+    This tool answers questions about the installation and execution of
+    the codebase by querying for documentation files.
     """
 
     def __init__(
@@ -604,38 +637,27 @@ class InstallationAndUseTool:
         self.base_prompt = base_prompt
         self.working_dir_path = working_dir_path
 
-    def __call__(
-            self,
-            user_prompt: str,
-            filepath_inexact: str = 'none') -> str:
-        """Answer questions about the installation and use of the codebase."""
+    def __call__(self, user_prompt: str) -> str:
+        """Run the tool.
 
-        # NOTE: Out of the box, the tool loader would not work if there were no parameters beyond
-        # the user_prompt.  I added additional_guidance, but it sucks.  Figure this out sometime
-        # when it's not 5:30 on Friday afternoon.
-        if filepath_inexact != 'none':
-            filepath = fuzzy_match_file_path(self.collection, filepath_inexact, 50)
-            if filepath is None:
-                return f'Could not find a source file matching `{filepath_inexact}`.'
+        Args:
+            user_prompt (str): The prompt to process.
+        """
 
-            results = self.collection.get(
-                include=['metadatas'],
-                where={'filepath': filepath}
-            )
-        else:
-            query = (
-                "What files contain documentation regarding the installation and "
-                "use of the codebase? Include README, configuration and environment "
-                "setup files."
-            )
-            doc_files = query_codebase(query, self.collection, n_results=15, where={'type': 'file'})
-            doc_files_uids = [chunk.uid for chunk in doc_files if '..' not in chunk.filepath]
 
-            results = query_codebase(
-                user_prompt,
-                self.collection, n_results=10,
-                where={'id': {'$in': doc_files_uids}}
-            )
+        query = (
+            "What files contain documentation regarding the installation and "
+            "use of the codebase? Include README, configuration and environment "
+            "setup files."
+        )
+        doc_files = query_codebase(query, self.collection, n_results=15, where={'type': 'file'})
+        doc_files_uids = [chunk.uid for chunk in doc_files if '..' not in chunk.filepath]
+
+        results = query_codebase(
+            user_prompt,
+            self.collection, n_results=10,
+            where={'id': {'$in': doc_files_uids}}
+        )
 
         prompt = self.base_prompt + '\n\n'
         for chunk in results:

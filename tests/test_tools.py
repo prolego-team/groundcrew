@@ -3,9 +3,6 @@ Tests for tools.
 """
 import chromadb
 
-<<<<<<< HEAD
-from groundcrew import tools
-=======
 from groundcrew import constants, tools
 
 
@@ -189,7 +186,6 @@ def test_singledocstringtool():
     assert not out
 
     #### End test _id_matches_function ####
->>>>>>> main
 
 
 def test_get_python_files():
@@ -349,6 +345,7 @@ def test_complexity_tool():
         metadatas=metadatas,
         documents=['garbage'] * len(ids)
     )
+    all_files = tools.get_python_files(collection)
 
     # do nothing
     llm_mock = lambda x: x
@@ -367,7 +364,7 @@ def test_complexity_tool():
             'test_func': {'complexity': 2, 'object': 'function'}
         }
     }
-    output = tool.complexity_analysis('max')
+    output = tool.complexity_analysis(files=all_files, sort_on='max')
     target_output = [
         'Cyclomatic complexity summary for the most complex files:',
         'File: foo.py; average complexity = 3.0; max complexity = 4',
@@ -380,8 +377,11 @@ def test_complexity_tool():
     ]
     assert output.split('\n') == target_output
 
-    output = tool.complexity_analysis('average')
+    output = tool.complexity_analysis(files=all_files, sort_on='average')
     assert output.split('\n') == target_output
+
+    output = tool.complexity_analysis(files={'foo.py': all_files['foo.py']}, sort_on='average')
+    assert output.split('\n') == target_output[:5] + ['']
 
 
 def test_lintfiletool():

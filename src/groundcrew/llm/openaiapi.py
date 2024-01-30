@@ -219,8 +219,13 @@ def start_chat(model: str, client: openai.Client) -> Callable:
 
     def chat_func(messages: list[Message], *args, **kwargs) -> Message:
         assert len(messages) > 0
-        assert isinstance(messages[0], SystemMessage) or isinstance(messages[0], UserMessage)
-        assert isinstance(messages[-1], UserMessage) or isinstance(messages[-1], ToolMessage)
+        # print('types:', [x.__class__ for x in messages])
+        start_idx = 1 if isinstance(messages[0], SystemMessage) else 0
+        for idx, msg in enumerate(messages[start_idx:]):
+            if idx % 2 == 0:
+                assert isinstance(msg, (UserMessage, ToolMessage)), 'expected UserMessage or ToolMessage'
+            else:
+                assert isinstance(msg, AssistantMessage), 'expected AssistantMessage'
 
         input_messages = [message_to_dict(message) for message in messages]
         try:
