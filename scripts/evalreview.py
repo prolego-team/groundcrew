@@ -28,8 +28,6 @@ def main():
     del headers['answer']
     headers = list(headers.keys())
 
-    import pandas as pd
-
     def update(idx: int) -> Any:
         """update"""
         _, record = records[idx]
@@ -41,9 +39,6 @@ def main():
 
     with gr.Blocks() as demo:
         gr.Markdown('# Review Evaluation Results')
-
-        # question = gr.Textbox(
-        #     value=DEFAULT_QUESTION, label='Ask a question about the data')
 
         with gr.Row():
             with gr.Column():
@@ -67,3 +62,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
