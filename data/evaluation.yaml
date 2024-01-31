@@ -75,7 +75,7 @@
           - Find the method that calculates the running cost, then run the linting tool on the file it's in.
       eval_func:
         type: contains_all
-        checks: ['src/neosophia/agents/agent.py', 'unused', 'import', 'variables']
+        checks: ['agent.py', 'unused', 'import', 'variables']
 
 #- name: Codebase QA Fuzzy
 #  tests:
