@@ -2,16 +2,12 @@
 Example of using an LLM to chat with a database.
 """
 
-import sys
-import logging
-import sqlite3
-from datetime import datetime
-
-
+from typing import Any
 import os
 import pickle
 
 import gradio as gr
+import pandas as pd
 
 
 def main():
@@ -22,31 +18,26 @@ def main():
     with open(input_file_path, 'rb') as f:
         data = pickle.load(f)
 
-    items = list(data.items())
+    records = list(data.items())
     keys = [
         f'`{x}` `{y}` {z}'
-        for (x, y, z), _ in items
+        for (x, y, z), _ in records
     ]
 
-    print(keys)
+    headers = dict(records[0][1])
+    del headers['answer']
+    headers = list(headers.keys())
 
-    # def answer_wrapper(chat_history):
-    #     final_message = chat_history[-1][1]
-    #     if final_message is None:
-    #         response = 'It appears the agent couldn\'t answer the questions.'
-    #     elif 'Final Answer:' in final_message:
-    #         response = final_message.split('Final Answer:')[1].strip()
-    #         response = response.split('\n')[0].strip()
-    #     else:
-    #         response = 'It appears the agent couldn\'t answer the questions.'
-    #
-    #     return response
+    import pandas as pd
 
-
-    def update(test_description) -> str:
-        """adlfkjahdfljka"""
-        print(test_description)
-
+    def update(idx: int) -> Any:
+        """update"""
+        _, record = records[idx]
+        record = dict(record)
+        res = record['answer']
+        del record['answer']
+        record = pd.DataFrame({k: [v] for k, v in record.items()})
+        return res, record
 
     with gr.Blocks() as demo:
         gr.Markdown('# Review Evaluation Results')
@@ -56,19 +47,23 @@ def main():
 
         with gr.Row():
             with gr.Column():
-                tests = gr.Dropdown(choices=keys, value=0)
+                tests = gr.Dropdown(choices=keys, value=0, type='index')
+            with gr.Column():
+                info = gr.DataFrame(value={}, headers=headers)
+
+        with gr.Row():
             with gr.Column():
                 answer = gr.Textbox(value='', label='Answer', interactive=False)
 
         tests.change(
             fn=update,
             inputs=[tests],
-            outputs=[answer]
+            outputs=[answer, info]
         )
 
     demo.queue()
     demo.launch()
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

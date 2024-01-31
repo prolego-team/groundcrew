@@ -38,7 +38,7 @@
     - name: lint C
       tool: LintFileTool
       params:
-        user_prompt: What are some import issues in agents/tools.pyç
+        user_prompt: What are some import issues in agents/tools.py
         filepath_inexact: agents/tools.py
       eval_func:
         type: contains_all
