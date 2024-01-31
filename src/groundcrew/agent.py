@@ -17,7 +17,8 @@ from yaspin.core import Yaspin
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import Message, SystemMessage, UserMessage
+from groundcrew.llm.openaiapi import (AssistantMessage, Message, SystemMessage,
+                                      UserMessage)
 
 
 class Agent:
@@ -66,16 +67,8 @@ class Agent:
             'agent': Colors.BLUE
         }
 
-    def run_shell_command(self, command: str) -> tuple[str, str | None]:
+    def run_shell_command(self, command: str) -> tuple[str, str]:
         """
-        Run a command in the shell process and return the output
-
-        Args:
-            command (str): The command to run
-
-        Returns:
-            output (str): The output of the command
-            error (str | None): The error message, if any
         """
         if self.shell_process:
 
@@ -84,33 +77,48 @@ class Agent:
             self.shell_process.stdin.flush()
 
             output = ''
+            error = ''
 
-            # Set stdout to non-blocking mode
-            fd = self.shell_process.stdout.fileno()
-            fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+            # Set stdout and stderr to non-blocking mode
+            stdout_fd = self.shell_process.stdout.fileno()
+            stderr_fd = self.shell_process.stderr.fileno()
+            fl_stdout = fcntl.fcntl(stdout_fd, fcntl.F_GETFL)
+            fl_stderr = fcntl.fcntl(stderr_fd, fcntl.F_GETFL)
+            fcntl.fcntl(stdout_fd, fcntl.F_SETFL, fl_stdout | os.O_NONBLOCK)
+            fcntl.fcntl(stderr_fd, fcntl.F_SETFL, fl_stderr | os.O_NONBLOCK)
 
-            # Keep reading until there's no more output
+            # Keep reading until there's no more output or error
             while True:
-                ready, _, _ = select.select(
-                    [self.shell_process.stdout], [], [], 0.1
+                read_ready, _, _ = select.select(
+                    [
+                        self.shell_process.stdout,
+                        self.shell_process.stderr
+                    ], [], [], 0.1
                 )
-                if ready:
+
+                if self.shell_process.stdout in read_ready:
                     try:
-                        # Read a chunk of output up to 1024 bytes
-                        chunk = os.read(fd, 1024).decode()
+                        chunk = os.read(stdout_fd, 1024).decode()
                         if chunk:
                             output += chunk
-                        else:
-                            # No more output
-                            break
                     except BlockingIOError:
                         # No more output available
                         pass
-                else:
+
+                if self.shell_process.stderr in read_ready:
+                    try:
+                        chunk = os.read(stderr_fd, 1024).decode()
+                        if chunk:
+                            error += chunk
+                    except BlockingIOError:
+                        # No more error available
+                        pass
+
+                if not read_ready:
+                    # No more output or error
                     break
 
-            return output, None
+            return output, error
         return '', 'Error: Shell process not initialized.'
 
     def start_shell_session(self) -> None:
@@ -126,8 +134,10 @@ class Agent:
                 text=True,
                 bufsize=1
             )
+            self.run_shell_command(f'export CONDA_DIR={self.config.conda_dir}')
+            self.run_shell_command('source src/groundcrew/.shellrc')
             self.shell_mode = True
-            self.user_shell_commands = []
+            self.shell_messages = []
 
     def stop_shell_session(self) -> None:
         """
@@ -181,12 +191,24 @@ class Agent:
         # Response with the last message from the agent
         self.print(self.messages[-1].content, 'agent')
 
+    def get_current_conda_env(self) -> str:
+        # Command to echo the CONDA_DEFAULT_ENV variable
+        command = 'echo $CONDA_DEFAULT_ENV'
+        stdout, _ = self.run_shell_command(command)
+
+        # The output will include the environment name, strip any whitespace
+        env_name = stdout.strip()
+
+        # Return the environment name or a default string if not found
+        return env_name if env_name else 'base'
 
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
         based on the input.
         """
+
+        current_env = 'base'
 
         while True:
 
@@ -196,7 +218,8 @@ class Agent:
 
                 str_prompt = '[user] > '
                 if self.shell_mode:
-                    str_prompt = f'[{self.config.shell}] > '
+                    current_env = self.get_current_conda_env()
+                    str_prompt = f'[{self.config.shell} | {current_env}] > '
 
                 user_prompt = input(str_prompt)
 
@@ -235,21 +258,34 @@ class Agent:
 
                 # User is asking a question to the LLM
                 if user_prompt.startswith('\\help'):
-                    user_prompt = user_prompt.replace(
-                        '\\help', '\n\n ### Question ###\n\n')
+                    user_prompt = user_prompt.replace('\\help', '')
 
-                    user_shell_messages = UserMessage(
-                        '\n'.join(self.user_shell_commands) + '\n\n' +
-                        user_prompt
+                    current_dir, _ = self.run_shell_command('pwd')
+
+                    user_shell_messages = 'Anaconda env: ' + current_env + '\n'
+                    user_shell_messages += 'Current dir: ' + current_dir + '\n\n'
+
+                    user_shell_messages += user_prompt + '\n\n' + '\n'.join(
+                        self.shell_messages) + '\n'
+
+                    print(user_shell_messages)
+
+                    system_prompt = sp.SHELL_PROMPT + '\n\n'
+                    system_prompt += sp.CHOOSE_TOOL_PROMPT + '\n\n'
+
+                    self.dispatch(
+                        system_prompt=system_prompt,
+                        user_prompt=user_shell_messages
                     )
 
-                    prompt = [
-                        SystemMessage(self.shell_system_prompt)
-                    ] + [user_shell_messages]
-                    [print(x, '\n********************\n') for x in prompt]
-                    response = self.llm(prompt)
-                    print('\n-------\n')
-                    print('response:', response)
+                    # Append dispatch messages except for the system prompt
+                    self.messages.extend(self.dispatch_messages)
+
+                    self.print_message_history(self.messages)
+
+                    # Response with the last message from the agent
+                    self.print(self.messages[-1].content, 'agent')
+
                 else:
                     std_out, std_err = self.run_shell_command(user_prompt)
                     user_message = f'Command: {user_prompt}\n\n'
@@ -264,7 +300,7 @@ class Agent:
                         print(std_err)
                         print(Colors.ENDC)
 
-                    self.user_shell_commands.append(user_message)
+                    self.shell_messages.append(user_message)
 
             else:
                 user_prompt = user_prompt.replace('\\code', '')
@@ -325,19 +361,19 @@ class Agent:
             the system's response
         """
 
-        spinner = yaspin(text='Thinking...', color='green')
-        spinner.start()
+        # spinner = yaspin(text='Thinking...', color='green')
+        # spinner.start()
 
         self.dispatch(user_prompt)
         self.messages.extend(self.dispatch_messages)
 
-        spinner.stop()
+        # spinner.stop()
 
         content = self.messages[-1].content
         self.print(content, 'agent')
         return content
 
-    def dispatch(self, agent_prompt: str, user_prompt: str) -> None:
+    def dispatch(self, system_prompt, user_prompt: str) -> None:
         """
         Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
@@ -354,8 +390,6 @@ class Agent:
             self.spinner.stop()
 
         #system_prompt = sp.AGENT_PROMPT + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
-        system_prompt = agent_prompt + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
-
         system_prompt += '### Tools ###\n'
         for tool in self.tools.values():
             system_prompt += tool.to_yaml() + '\n\n'

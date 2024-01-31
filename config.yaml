@@ -8,6 +8,11 @@ Tools:
       - CodebaseQATool
       - SingleDocstringTool
       - LintFileTool
+      - GetFileContentsTool
+      - CyclomaticComplexityTool
+      - FindUsageTool
+      - InstallationAndUseTool
 colorscheme: 'gruvbox-dark'
-debug: false
+debug: true
 shell: /bin/zsh
+conda_dir: /Users/cameronfabbri/miniforge3

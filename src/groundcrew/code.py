@@ -7,6 +7,7 @@ from git import Repo
 
 from groundcrew.constants import DEFAULT_EF
 from groundcrew.dataclasses import Chunk
+from groundcrew.code_utils import get_imports_from_code, import_called_as
 
 opj = os.path.join
 
@@ -69,7 +70,7 @@ def extract_python_from_file(file_text, node_types):
             }
 
         def visit_ClassDef(self, node):
-            if ast.ClassDef  == node_types:
+            if ast.ClassDef == node_types:
                 self.update_texts(node, node.name)
             self.current_class = node.name
             self.generic_visit(node)
@@ -98,4 +99,3 @@ def init_db(client, repository, exts):
     )
 
     return collection, files
-
