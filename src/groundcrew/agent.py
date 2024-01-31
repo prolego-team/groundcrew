@@ -1,6 +1,9 @@
 """
 Main agent class interacting with a user
 """
+import os
+import fcntl
+import select
 import inspect
 import readline
 import subprocess
@@ -14,8 +17,7 @@ from yaspin.core import Yaspin
 
 from groundcrew import agent_utils as autils, system_prompts as sp, utils
 from groundcrew.dataclasses import Colors, Config, Tool
-from groundcrew.llm.openaiapi import (AssistantMessage, Message, SystemMessage,
-                                      UserMessage)
+from groundcrew.llm.openaiapi import Message, SystemMessage, UserMessage
 
 
 class Agent:
@@ -51,6 +53,12 @@ class Agent:
         self.messages: list[Message] = []
         self.spinner: Yaspin | None = None
         self.shell_process = None
+        self.shell_mode = False
+
+        self.shell_system_prompt = sp.SHELL_PROMPT + '\n\n'
+        self.shell_system_prompt += sp.CHOOSE_TOOL_PROMPT + '\n### Tools ###\n'
+        for tool in self.tools.values():
+            self.shell_system_prompt += tool.to_yaml() + '\n\n'
 
         self.colors = {
             'system': Colors.YELLOW,
@@ -58,18 +66,77 @@ class Agent:
             'agent': Colors.BLUE
         }
 
-    def run_shell_command(self, command):
-        process = subprocess.Popen(
-            command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            executable=self.config.shell)
+    def run_shell_command(self, command: str) -> tuple[str, str | None]:
+        """
+        Run a command in the shell process and return the output
 
-        # Capture stdout and stderr
-        stdout, stderr = process.communicate()
+        Args:
+            command (str): The command to run
 
-        return stdout.decode(), stderr.decode()
+        Returns:
+            output (str): The output of the command
+            error (str | None): The error message, if any
+        """
+        if self.shell_process:
+
+            # Write the command and flush immediately
+            self.shell_process.stdin.write(command + '\n')
+            self.shell_process.stdin.flush()
+
+            output = ''
+
+            # Set stdout to non-blocking mode
+            fd = self.shell_process.stdout.fileno()
+            fl = fcntl.fcntl(fd, fcntl.F_GETFL)
+            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+
+            # Keep reading until there's no more output
+            while True:
+                ready, _, _ = select.select(
+                    [self.shell_process.stdout], [], [], 0.1
+                )
+                if ready:
+                    try:
+                        # Read a chunk of output up to 1024 bytes
+                        chunk = os.read(fd, 1024).decode()
+                        if chunk:
+                            output += chunk
+                        else:
+                            # No more output
+                            break
+                    except BlockingIOError:
+                        # No more output available
+                        pass
+                else:
+                    break
+
+            return output, None
+        return '', 'Error: Shell process not initialized.'
+
+    def start_shell_session(self) -> None:
+        """
+        Start a new persistent shell session
+        """
+        if not self.shell_process:
+            self.shell_process = subprocess.Popen(
+                ['/bin/zsh'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                bufsize=1
+            )
+            self.shell_mode = True
+            self.user_shell_commands = []
+
+    def stop_shell_session(self) -> None:
+        """
+        Terminate the shell process
+        """
+        if self.shell_process:
+            self.shell_process.terminate()
+            self.shell_process = None
+            self.shell_mode = False
 
     def print(self, text: str, role: str) -> None:
         """
@@ -114,42 +181,12 @@ class Agent:
         # Response with the last message from the agent
         self.print(self.messages[-1].content, 'agent')
 
-    def start_shell_session(self):
-        if not self.shell_process:
-            self.shell_process = subprocess.Popen(
-                [self.config.shell],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                bufsize=1
-            )
-
-    def run_shell_command(self, command):
-        if self.shell_process:
-            # Send command to the shell process
-            self.shell_process.stdin.write(command + '\n')
-            self.shell_process.stdin.flush()
-            # Read command output
-            output = self.shell_process.stdout.readline()
-            return output, None
-        return '', 'Shell process not initialized.'
-
-    def stop_shell_session(self):
-        """
-        Terminate the shell process
-        """
-        if self.shell_process:
-            self.shell_process.terminate()
-            self.shell_process = None
 
     def run(self):
         """
         Continuously listen for user input and respond using the chosen tool
         based on the input.
         """
-
-        self.shell_mode = False
 
         while True:
 
@@ -162,6 +199,7 @@ class Agent:
                     str_prompt = f'[{self.config.shell}] > '
 
                 user_prompt = input(str_prompt)
+
                 if '\\code' in user_prompt:
                     code_mode = True
                     print(Colors.YELLOW)
@@ -179,37 +217,61 @@ class Agent:
                     print('Shell mode activated — type \exit to exit')
                     print('Current shell:', self.config.shell)
                     print('Current dir:', self.run_shell_command('pwd')[0])
+                    print('To ask the LLM a question, start your command with \\help')
                     print(Colors.ENDC)
                     self.start_shell_session()
                     user_prompt = ''
                     continue
 
-                elif '\\exit' in user_prompt:
-                    print(Colors.RED)
+                elif '\\exit' in user_prompt and self.shell_mode:
+                    print(Colors.CYAN)
                     print('Shell mode exited')
                     print(Colors.ENDC)
-                    self.shell_mode = False
                     self.stop_shell_session()
+                    user_prompt = ''
                     continue
 
             if self.shell_mode:
-                std_out, std_err = self.run_shell_command(user_prompt)
-                if std_out:
-                    print(Colors.GREEN)
-                    print(std_out)
-                    print(Colors.ENDC)
-                if std_err:
-                    print(Colors.RED)
-                    print(std_err)
-                    print(Colors.ENDC)
 
-            '''
-            user_prompt = user_prompt.replace('\\code', '')
-            if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
-                break
+                # User is asking a question to the LLM
+                if user_prompt.startswith('\\help'):
+                    user_prompt = user_prompt.replace(
+                        '\\help', '\n\n ### Question ###\n\n')
 
-            self.interact(user_prompt)
-            '''
+                    user_shell_messages = UserMessage(
+                        '\n'.join(self.user_shell_commands) + '\n\n' +
+                        user_prompt
+                    )
+
+                    prompt = [
+                        SystemMessage(self.shell_system_prompt)
+                    ] + [user_shell_messages]
+                    [print(x, '\n********************\n') for x in prompt]
+                    response = self.llm(prompt)
+                    print('\n-------\n')
+                    print('response:', response)
+                else:
+                    std_out, std_err = self.run_shell_command(user_prompt)
+                    user_message = f'Command: {user_prompt}\n\n'
+                    if std_out:
+                        user_message += f'Stdout:\n{std_out}\n\n'
+                        print(Colors.GREEN)
+                        print(std_out)
+                        print(Colors.ENDC)
+                    if std_err:
+                        user_message += f'Stderr:\n{std_err}\n\n'
+                        print(Colors.RED)
+                        print(std_err)
+                        print(Colors.ENDC)
+
+                    self.user_shell_commands.append(user_message)
+
+            else:
+                user_prompt = user_prompt.replace('\\code', '')
+                if user_prompt == 'exit' or user_prompt == 'quit' or user_prompt == 'q':
+                    break
+
+                self.interact(user_prompt)
 
     def run_tool(self, parsed_response: dict[str, str | list[str]]) -> str:
         """
@@ -275,7 +337,7 @@ class Agent:
         self.print(content, 'agent')
         return content
 
-    def dispatch(self, user_prompt: str) -> None:
+    def dispatch(self, agent_prompt: str, user_prompt: str) -> None:
         """
         Analyze the user's input and either respond or choose an appropriate
         tool for generating a response. When a tool is called, the output from
@@ -291,7 +353,9 @@ class Agent:
         if self.spinner is not None:
             self.spinner.stop()
 
-        system_prompt = sp.AGENT_PROMPT + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        #system_prompt = sp.AGENT_PROMPT + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
+        system_prompt = agent_prompt + '\n\n' + sp.CHOOSE_TOOL_PROMPT + '\n\n'
+
         system_prompt += '### Tools ###\n'
         for tool in self.tools.values():
             system_prompt += tool.to_yaml() + '\n\n'
