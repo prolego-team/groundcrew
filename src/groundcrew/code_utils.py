@@ -41,9 +41,25 @@ def imports_entity(
     ) -> bool:
     """Returns True if the imports list imports the entity from the module.
 
-    If entity is None, returns True if the imports list imports the module.
-    If entity is not None, returns True if the imports list imports the entity from
-    the module."""
+    Imports are checked by comparing the first n period-separated elements of
+    the importable_object where n is the number of overlapping elements.
+    For example:
+
+    - importable_object = 'numpy.random.rand'
+        - 'import numpy' in file returns True
+        - 'import numpy.random' in file returns True
+        - 'import numpy.random.rand' in file returns True
+        - 'import numpy.random.randn' in file returns False
+        - 'import random.rand' in file returns False
+    - importable_object = 'torch.nn'
+        - 'import torch' in file returns True
+        - 'import torch.nn' in file returns True
+        - 'import torch.nn.functional' in file returns True
+        - 'import nn.functional' in file returns False
+
+    Each import in the imports list should contain the fully qualified name
+    of import objects, resolving aliases as needed.  c.f. get_imports_from_code.
+    """
     test = importable_object.split('.')
     for imp in imports:
         imp_name = imp.name.split('.')
@@ -57,14 +73,18 @@ def imports_entity(
 def import_called_as(
         imports: list[Import],
         importable_object: str,
-    ) -> str:
-    """Returns the name of the entity if the imports list imports the entity.
+    ) -> list[str]:
+    """Returns the names of the importable_object if the imports list imports that
+    object.  The names are returned as they are referenced in the code, accounting
+    for import aliases.
 
-    The returned string provides the name of the entity as it is called in the code,
-    accounting for import aliases. If the entity is None, the name of the module is
-    returned as it is aliased in the code.
-
-    If the entity or module is not found, None is returned."""
+    A list of names is returned because the same object could be accessed by multiple
+    imports (e.g., import numpy as np; import numpy.random as npr would
+    For example:
+    - importable_object = 'numpy.random.rand'
+    - imports = get_imports_from_code('import numpy as np; import numpy.random as npr')
+    - return value = ['np.random.rand', 'npr.rand']
+    """
     test = importable_object.split('.')
     calls = []
     for imp in imports:
@@ -73,7 +93,7 @@ def import_called_as(
         if test[:n] == imp_name[:n]:
             call = imp.asname
             if n < len(test):
-                call += '.' + '.'.join(test[n:])
+                call = '.'.join([call] + test[n:])
             calls.append(call)
 
     return calls
@@ -82,22 +102,27 @@ def import_called_as(
 def cyclomatic_complexity(code: str) -> dict:
     """Compute the cyclomatic complexity of a piece of code."""
     v = ComplexityVisitor.from_code(code)
-    output = {}
-    for func in v.functions:
-        output[func.name] = {
+
+    output = {
+        func.name: {
             'object': 'function',
             'complexity': func.complexity
         }
+        for func in v.functions
+    }
 
-    for clss in v.classes:
-        output[clss.name] = {
+    output.update({
+        clss.name: {
             'object': 'class',
             'complexity': clss.complexity,
-            'methods': {}
-        }
-        for meth in clss.methods:
-            output[clss.name]['methods'][meth.name] = {
-                'complexity': meth.complexity
+            'methods': {
+                meth.name: {
+                    'complexity': meth.complexity
+                }
+                for meth in clss.methods
             }
+        }
+        for clss in v.classes
+    })
 
     return output

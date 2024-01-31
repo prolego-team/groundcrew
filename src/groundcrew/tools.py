@@ -3,6 +3,7 @@ File for Tools
 """
 import os
 import subprocess
+import re
 
 from typing import Callable
 
@@ -425,7 +426,7 @@ class CyclomaticComplexityTool:
         else:
             files = get_python_files(self.collection)
 
-        sort_on = sort_on.lower()
+        sort_on = str(sort_on).lower()
         if sort_on not in ['average', 'max']:
             return 'The sort_on parameter passed to CyclomaticComplexityTool must be "average" or "max".'
 
@@ -456,7 +457,13 @@ class CyclomaticComplexityTool:
         }
 
     def complexity_analysis(self, files: dict[str, str], sort_on: str) -> tuple[list[str], dict]:
-        """Analyze the complexity of the codebase."""
+        """Analyze the complexity of the codebase.
+
+        This method will return a list of the most complex files in the codebase.
+        If there are objects exceeding the `min_max_complexity`, then only those
+        objects will be returned.  Otherwise, the list will return a "greedy" search
+        for the most complex objects, including only those more complex than any found
+        prior to it."""
 
         file_complexity = {}
         current_max = 0
@@ -545,6 +552,8 @@ class FindUsageTool:
         """Get the usage of an entity from a package/module."""
         files = get_python_files(self.collection)
 
+        import_pattern = r'^import\s|from.*\simport\s'
+
         usages = {}
         for file, source_code in files.items():
             file_imports = cu.get_imports_from_code(source_code)
@@ -552,7 +561,7 @@ class FindUsageTool:
                 called_as = cu.import_called_as(file_imports, importable_object)
                 source_without_imports = '\n'.join(
                     line for line in source_code.split('\n')
-                    if 'import' not in line
+                    if not re.search(import_pattern, line)
                 )
                 usage_count = sum(source_without_imports.count(call) for call in called_as)
                 if usage_count > 0:
@@ -607,7 +616,7 @@ class GetFileContentsTool:
 
         items = self.collection.get(
             include=['metadatas'],
-            where={'filepath': filepath}
+            where={'filepath': filepath, 'type': 'file'}
         )
 
         output = (
@@ -643,9 +652,8 @@ class InstallationAndUseTool:
             user_prompt (str): The prompt to process.
         """
         query = (
-            "What files contain documentation regarding the installation and "
-            "use of the codebase? Include README, configuration and environment "
-            "setup files."
+            "documentation regarding the installation and use of the codebase. "
+            "README, configuration, environment."
         )
         doc_files = query_codebase(query, self.collection, n_results=15, where={'type': 'file'})
         doc_files_uids = [chunk.uid for chunk in doc_files if '..' not in chunk.filepath]
@@ -658,7 +666,7 @@ class InstallationAndUseTool:
 
         prompt = self.base_prompt + '\n\n'
         for chunk in results:
-            prompt += f'Contents of file {chunk.filepath}:\n'
+            prompt += f'### Contents of file {chunk.filepath} ###\n'
             prompt += chunk.text + '\n\n'
 
         prompt += self.base_prompt + '\n### Question ###\n'

@@ -3,7 +3,6 @@
 import os
 import ast
 
-import tqdm
 from git import Repo
 
 from groundcrew.constants import DEFAULT_EF
@@ -87,34 +86,6 @@ def extract_python_from_file(file_text, node_types):
     visitor.visit(ast.parse(file_text))
 
     return texts
-
-
-def find_object_use(
-        filepaths: list[str],
-        package_module_name: str,
-        object_name: str
-    ) -> dict[str, list[str]]:
-    """Returns a dictionary of filepaths to lines where the object is called."""
-    function_use = {}
-
-    for file in tqdm(filepaths):
-        with open(file, 'r') as f:
-            file_text = f.read()
-        imports = get_imports_from_code(file_text)
-        function_call = import_called_as(imports, package_module_name, object_name)
-
-        if function_call is None:
-            continue
-
-        function_calls = [
-            (line_no, line.strip())
-            for line_no, line in enumerate(file_text.split('\n'))
-            if function_call in line and 'import' not in line
-        ]
-        if len(function_calls) > 0:
-            function_use[file] = function_calls
-
-    return function_use
 
 
 def init_db(client, repository, exts):
