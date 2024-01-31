@@ -1,8 +1,7 @@
 """
-Example of using an LLM to chat with a database.
+Review evaluation results interactively.
 """
 
-from typing import Any
 import os
 import pickle
 
