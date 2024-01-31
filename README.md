@@ -1,5 +1,54 @@
 # Groundcrew
 
+## About
+
+Groundcrew is an LLM Retrieval Augmented Generation (RAG) solution for a code repository, or "chat with your code". Benefits:
+- improved code maintenance
+- better knowledge management and documentation
+- faster engineering onboarding
+- more effient surfacing of code issues
+
+Groundcrew is a companion for code generation solutions like GitHub Copilot. Copilot helps you generate code, while Groundcrew reveals code insights.
+
+## Using Groundcrew
+
+You can run Groundcrew against your code repository as described below. More importantly, you leverage the foundational interfaces and approach to build and maintain your own solution for improving developer efficiency.
+
+## Approach
+
+Groundcrew equips an "agent" (LLM) with access to an extensible set of "tools" that are used to answer user questions.  These two foundational components are described below.
+
+### Tools
+
+ Tools augment the LLM's capabilities, giving the LLM intentional and targeted functionality that minimizes generic responses and hallucinations. They also allow the user to structure the interactions with the LLM in a way that's useful for the user.
+
+For example, if you show an LLM a Python script from a codebase and ask how to run it, the LLM will tend to answer generically: create a virtual environment, install the dependencies, run the file with the Python interpreter, etc.  This is correct, but often unhelpful. Where are the dependencies located? What version of Python should you use? Did the developers even intend for you to run that file as a standalone script? In short, the LLM's canned response based on the source code has ignored other relevant context from the project's documentation and configuration files.
+
+Instead, we created an "Installation and Usage" tool that enables the LLM to search the codebase for documenation and setup files. Those specific pieces of information will in turn produce a much more useful response to the user.
+
+Here are some other tools have been developed to give the LLM specific and efficient functionality:
+
+- A codebase question answering system that answers generic questions about the code, e.g., "What does function xyz do?";
+- A linting tool that will summarize poorly formatted code;
+- A docstring general tool for functions and classes;
+- A complexity analysis tool that will point the user to parts of the code that may need to be refactored;
+- A search capability to find the use of classes and functions across files.
+
+These are examples of some tools we've implemented so far. If a new situation emerges where the `groundcrew` system struggles, there is a good chance that all you need to do is add a new tool. No need to implement complex logic or modify the agent LLM. Just write a function to address the new facet of the problem, then let the agent do the rest.
+
+### The Agent
+
+Tool use is coordinated by an "agent" LLM that can choose which tool to use, call the tool, then respond to the user. An agent can also call multiple tools in sequence if that's what is needed to answer the user's question. In short, the agent is the "interface" that the user interacts with.
+
+As you interact with the agent, all of the questions, tool calls and answers are kept in a working memory. This means you can ask the agent are series of questions in a conversational manner.
+
+If the "tools" of `groundcrew` are like workers helping you with your code-related tasks, the agent is the manager of those workers, assigning the right resources given the task at hand.
+
+### More resources
+
+[Generative AI, Step-by-step](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbJSkWVqZ2YWUCXrLeFPjV6) - A YouTube playlist that presents each step in building Groundcrew starting with the idea. Contains demos and technical deep dives with the team.
+[LLM RAG fundamentals](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbz78Z5QXsZhe9rHuCs1Jw-)
+
 ## Installation
 
 Run the following commands to install `groundcrew` in a dedicated Python (Anaconda) environment.
