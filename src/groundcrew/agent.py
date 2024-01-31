@@ -178,13 +178,13 @@ class Agent:
             the system's response
         """
 
-        spinner = yaspin(text='Thinking...', color='green')
-        spinner.start()
+        # spinner = yaspin(text='Thinking...', color='green')
+        # spinner.start()
 
         self.dispatch(user_prompt)
         self.messages.extend(self.dispatch_messages)
 
-        spinner.stop()
+        # spinner.stop()
 
         content = self.messages[-1].content
         self.print(content, 'agent')
