@@ -11,8 +11,7 @@ Groundcrew is an LLM Retrieval Augmented Generation (RAG) solution for a code re
 Groundcrew is a companion for code generation solutions like GitHub Copilot. Copilot helps you generate code, while Groundcrew reveals code insights.
 
 ## Using Groundcrew
-
-You can run Groundcrew against your code repository as described below. More importantly, you leverage the foundational interfaces and approach to build and maintain your own solution for improving developer efficiency.
+This is a prelminary release and will require customization by a development team. You can run Groundcrew against your code repository as described below. More importantly, you can leverage the foundational interfaces and approach to build and maintain your own solution for improving developer efficiency.
 
 ## Approach
 
