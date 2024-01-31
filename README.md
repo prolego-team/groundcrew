@@ -46,8 +46,8 @@ If the "tools" of `groundcrew` are like workers helping you with your code-relat
 
 ### More resources
 
-[Generative AI, Step-by-step]([url](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbJSkWVqZ2YWUCXrLeFPjV6)) - A YouTube playlist that presents each step in building Groundcrew starting with the idea. Contains demos and technical deep dives with the team.
-[LLM RAG fundamentals]([url](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbz78Z5QXsZhe9rHuCs1Jw-))
+[Generative AI, Step-by-step](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbJSkWVqZ2YWUCXrLeFPjV6) - A YouTube playlist that presents each step in building Groundcrew starting with the idea. Contains demos and technical deep dives with the team.
+[LLM RAG fundamentals](https://www.youtube.com/playlist?list=PL-pTHQz4RcBbz78Z5QXsZhe9rHuCs1Jw-)
 
 ## Installation
 
