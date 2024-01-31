@@ -17,6 +17,7 @@ def main():
         x for x in eval_dirs
         if os.path.isdir(x) and x.startswith('eval_')
     ]
+    eval_dirs = sorted(eval_dirs)
 
     data = [None]
 
