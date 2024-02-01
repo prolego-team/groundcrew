@@ -19,7 +19,7 @@ def main():
     ]
     eval_dirs = sorted(eval_dirs)
 
-    data = [None]
+    data: list[dict | None] = [None]
 
     def load_eval_runs(eval_dir_path: str) -> None:
         """Load results from a file."""
@@ -31,7 +31,7 @@ def main():
             data[0] = {}
 
     def update_tests() -> gr.Dropdown:
-        """Update test seleection."""
+        """Update test selection."""
         records = list(data[0].items())
         keys = [
             f'`{x}` `{y}` {z}'
@@ -42,7 +42,6 @@ def main():
 
     def update_answer(idx: int) -> tuple[str, pd.DataFrame]:
         """Update answer text box."""
-
         if idx is None or data[0] is None:
             res = ''
             record = {}
