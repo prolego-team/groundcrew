@@ -54,7 +54,7 @@ def imports_entity(
     - importable_object = 'torch.nn'
         - 'import torch' in file returns True
         - 'import torch.nn' in file returns True
-        - 'import torch.nn.functional' in file returns True
+        - 'import torch.nn.functional' in file returns False
         - 'import nn.functional' in file returns False
 
     Each import in the imports list should contain the fully qualified name
