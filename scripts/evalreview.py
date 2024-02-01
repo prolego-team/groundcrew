@@ -10,7 +10,7 @@ import pandas as pd
 
 
 def main():
-    """Setup and run gr app."""
+    """Setup and run gradio app."""
 
     eval_dirs = os.listdir('.')
     eval_dirs = [
