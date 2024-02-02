@@ -68,7 +68,14 @@
       eval_func:
         type: contains_all
         checks: ['"""', 'List', 'Returns']
-
+    - name: tool chaining
+      tool: Agent
+      params:
+        user_prompts:
+          - Find the method that calculates the running cost, then run the linting tool on the file it's in.
+      eval_func:
+        type: contains_all
+        checks: ['agent.py', 'unused', 'import', 'variables']
 
 #- name: Codebase QA Fuzzy
 #  tests:

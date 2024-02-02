@@ -184,7 +184,8 @@ class Agent:
         self.dispatch(user_prompt)
         self.messages.extend(self.dispatch_messages)
 
-        # spinner.stop()
+        # if self.spinner is not None:
+        #     self.spinner.stop()
 
         content = self.messages[-1].content
         self.print(content, 'agent')
@@ -250,7 +251,11 @@ class Agent:
             self.spinner.start()
 
             # Run Tool
-            tool_response = self.run_tool(parsed_select_tool_response)
+            try:
+                tool_response = self.run_tool(parsed_select_tool_response)
+            except Exception:
+                tool_response = ''
+
             self.spinner.stop()
 
             tool_response_message = 'Tool response\n' + tool_response
