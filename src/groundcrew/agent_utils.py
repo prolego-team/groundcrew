@@ -71,4 +71,3 @@ def parse_response(text: str, keywords: list[str]) -> dict[str, str | list[str]]
             result_dict[keyword] = value
 
     return result_dict
-

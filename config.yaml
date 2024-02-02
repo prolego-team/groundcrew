@@ -8,5 +8,9 @@ Tools:
       - CodebaseQATool
       - SingleDocstringTool
       - LintFileTool
+      - GetFileContentsTool
+      - CyclomaticComplexityTool
+      - FindUsageTool
+      - InstallationAndUseTool
 colorscheme: 'gruvbox-dark'
-debug: false
+debug: true
