@@ -42,8 +42,8 @@ Response: Write your response here. Your response should be limited to 3 sentenc
 ```
 """
 
-# TODO: Might be able to optimize this a bit more
-TOOL_RESPONSE_PROMPT = 'If you can answer the complete question do so, otherwise choose a Tool.'
+TOOL_RESPONSE_PROMPT = """If you can answer the complete question, do so using the output from the Tool Response. If you cannot answer the complete question, choose a Tool.
+"""
 
 CODEQA_PROMPT = "Your answer should only include information that pertains to the question."
 
