@@ -440,7 +440,8 @@ class CyclomaticComplexityTool:
 
         return self.llm(prompt)
 
-    def get_complexity(self, source_code: str) -> dict[str, dict]:
+    @staticmethod
+    def __get_complexity(source_code: str) -> dict[str, dict]:
         """Get the complexity of source code."""
 
         complexity_dict = cu.cyclomatic_complexity(source_code)
@@ -468,7 +469,7 @@ class CyclomaticComplexityTool:
         file_complexity = {}
         current_max = 0
         for file, source_code in files.items():
-            complexity = self.get_complexity(source_code)
+            complexity = self.__get_complexity(source_code)
             if complexity['max'] >= self.min_max_complexity or complexity['max'] > current_max:
                 file_complexity[file] = complexity
                 current_max = max(current_max, complexity['max'])
@@ -487,9 +488,10 @@ class CyclomaticComplexityTool:
         else:
             sorted_filenames = [item[0] for item in sorted_complexity]
 
-        return self.summarize(file_complexity, sorted_filenames)
+        return self.__summarize(file_complexity, sorted_filenames)
 
-    def summarize(self, file_complexity: dict, file_list: list[str]) -> str:
+    @staticmethod
+    def __summarize(file_complexity: dict, file_list: list[str]) -> str:
         """Summarize the complexity of a list of files.
 
         The file_complexity dict should be keyed by file name and have values that were
