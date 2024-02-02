@@ -352,7 +352,7 @@ def test_complexity_tool():
 
     tool = tools.CyclomaticComplexityTool('You are a tool.', collection, llm_mock)
     assert set(tools.get_python_files(collection).keys()) == {'foo.py', 'bar.py'}
-    assert tool.get_complexity(source_code[0]) == {
+    assert tool._CyclomaticComplexityTool__get_complexity(source_code[0]) == {
         'average': 3.0,
         'max': 4,
         'details': {
