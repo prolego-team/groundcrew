@@ -1,5 +1,8 @@
 # Groundcrew
 
+## Demo & discussion
+[Listen to the team on YouTube Live ](https://www.youtube.com/watch?v=11dJL5a-jJg)
+
 ## About
 
 Groundcrew is an LLM Retrieval Augmented Generation (RAG) solution for a code repository, or "chat with your code". Benefits:
