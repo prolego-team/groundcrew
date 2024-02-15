@@ -282,7 +282,7 @@ def load_system_from_config(
 
     # ~~~~ check the code version of the repo we are going to test
 
-    repo = git.Repo(config.repository)
+    repo = git.Repo(os.path.expanduser(config.repository))
     assert repo.head.commit.hexsha == hash_check
 
     # ~~~~ build the system (collection, llm, etc)
@@ -322,7 +322,7 @@ def load_system_from_config(
             tool_descriptions=tool_descs,
             collection=collection,
             llm=llm,
-            working_dir_path=config.repository
+            working_dir_path=os.path.expanduser(config.repository)
         )
 
         def run_agent(user_prompts: List[str]) -> str:
@@ -357,7 +357,7 @@ def load_system_from_config(
             base_prompt=tool_descs['LintFileTool']['base_prompt'],
             collection=collection,
             llm=x,
-            working_dir_path=config.repository
+            working_dir_path=os.path.expanduser(config.repository)
         ),
         'Agent': agent_wrapper
     }
