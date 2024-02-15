@@ -92,7 +92,7 @@ def init_db(client, repository, exts):
 
     # Get the committed files from the repo
     files = list(get_committed_files(repository, exts))
-    files = [x.split(os.path.abspath(repository))[1][1:] for x in files]
+    files = [x.split(os.path.abspath(os.path.expanduser(repository)))[1][1:] for x in files]
 
     collection = client.get_or_create_collection(
         name='database', embedding_function=DEFAULT_EF
