@@ -186,7 +186,7 @@ def main(config: str, model: str, prompts_file: str | None):
     client = chromadb.PersistentClient(config.db_path)
 
     # Initialize the database and get a list of files in the repo
-    collection, files = init_db(client, config.repository, config.extensions)
+    collection, files = init_db(client, os.path.expanduser(config.repository), config.extensions)
     files = sorted(files)
 
     # LLM that takes a string as input and returns a string
@@ -206,7 +206,7 @@ def main(config: str, model: str, prompts_file: str | None):
 
     # Generate summaries for files, classes, and functions
     for i, filepath in enumerate(files):
-        summarize_file(filepath, config.repository, llm, descriptions)
+        summarize_file(filepath, os.path.expanduser(config.repository), llm, descriptions)
 
     # Save the descriptions to a file in the cache directory
     with open(descriptions_file, 'wb') as f:
@@ -226,7 +226,7 @@ def main(config: str, model: str, prompts_file: str | None):
         tool_descriptions,
         collection,
         llm,
-        config.repository
+        os.path.expanduser(config.repository)
     )
     utils.save_tools_to_yaml(tools, tools_filepath)
 

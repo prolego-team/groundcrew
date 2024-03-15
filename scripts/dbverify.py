@@ -24,8 +24,8 @@ def main(config: str):
     config = Config(**config)
 
     # get files in repo
-    file_paths = list(code.get_committed_files(config.repository, config.extensions))
-    file_paths = [x.split(os.path.abspath(config.repository))[1][1:] for x in file_paths]
+    file_paths = list(code.get_committed_files(os.path.expanduser(config.repository), config.extensions))
+    file_paths = [x.split(os.path.abspath(os.path.expanduser(config.repository)))[1][1:] for x in file_paths]
 
     # client and collection
     client = chromadb.PersistentClient(config.db_path)
@@ -96,10 +96,10 @@ def main(config: str):
     descriptions_fixed = {}
     fixed_count = 0
     for k, v in descriptions.items():
-        if k.startswith(config.repository):
-            k_fixed = os.path.relpath(k, config.repository)
+        if k.startswith(os.path.expanduser(config.repository)):
+            k_fixed = os.path.relpath(k, os.path.expanduser(config.repository))
             print(k, '->', k_fixed)
-            assert k == (config.repository + '/' + k_fixed)
+            assert k == (os.path.expanduser(config.repository) + '/' + k_fixed)
             fixed_count += 1
             k = k_fixed
         descriptions_fixed[k] = v
