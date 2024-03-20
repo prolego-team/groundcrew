@@ -14,3 +14,5 @@ Tools:
       - InstallationAndUseTool
 colorscheme: 'gruvbox-dark'
 debug: true
+shell: /bin/zsh
+conda_dir: /Users/cameronfabbri/miniforge3

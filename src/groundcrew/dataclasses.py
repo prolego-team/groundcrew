@@ -19,7 +19,8 @@ class Config:
     Tools: [str]
     colorscheme: str
     debug: bool
-
+    shell: str
+    conda_dir: str
 
 @dataclass
 class Chunk:
