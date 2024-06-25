@@ -31,7 +31,9 @@ def get_committed_files(
         repository_dir: str, extensions: list[str]) -> list[str]:
     """
     This function finds all files in a directory and filters out those not
-    committed to the repository
+    committed to the repository.
+
+    Returns a list of absolute paths to files that are committed to the
 
     Args:
         repository_dir: str
@@ -51,6 +53,43 @@ def get_committed_files(
 
     return committed_files
 
+def extract_java_from_file(file_text):
+    file_lines = file_text.split('\n')
+    texts = {}
+
+    class NodeVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.current_class = None
+
+        def update_texts(self, node, key):
+            texts[key] = {
+                'text': '\n'.join(file_lines[node.lineno - 1:node.end_lineno]),
+                'start_line': node.lineno,
+                'end_line': node.end_lineno,
+                'is_method': self.current_class is not None,
+                'is_class': isinstance(node, ast.ClassDef)
+            }
+
+        def visit_ClassDef(self, node):
+            if ast.ClassDef == node_types:
+                self.update_texts(node, node.name)
+            self.current_class = node.name
+            self.generic_visit(node)
+            self.current_class = None
+
+        def visit_FunctionDef(self, node):
+            if ast.FunctionDef == node_types:
+                key = f"{self.current_class}.{node.name}" if self.current_class else node.name
+                self.update_texts(node, key)
+            self.generic_visit(node)
+
+    visitor = NodeVisitor()
+    try:
+        visitor.visit(ast.parse(file_text))
+    except SyntaxError:
+        print('Failed to parse', file_text)
+
+    return texts
 
 def extract_python_from_file(file_text, node_types):
     file_lines = file_text.split('\n')
@@ -83,7 +122,10 @@ def extract_python_from_file(file_text, node_types):
             self.generic_visit(node)
 
     visitor = NodeVisitor()
-    visitor.visit(ast.parse(file_text))
+    try:
+        visitor.visit(ast.parse(file_text))
+    except SyntaxError:
+        print('Failed to parse', file_text)
 
     return texts
 
