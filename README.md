@@ -53,11 +53,21 @@ If the "tools" of `groundcrew` are like workers helping you with your code-relat
 
 ## Installation
 
-Run the following commands to install `groundcrew` in a dedicated Python (Anaconda) environment.
+Run the following commands to install `groundcrew` in a dedicated Python (Anaconda) environment:
 
 ```shell
 git clone https://github.com/prolego-team/groundcrew.git
 conda env create -f groundcrew/env.yaml
+```
+
+If you're on macOS, run this command:
+
+```shell
+conda init zsh
+```
+Then, regardless of platofrm, run the following commmands:
+
+```shell
 conda activate groundcrew
 pip install -e groundcrew
 cd groundcrew
