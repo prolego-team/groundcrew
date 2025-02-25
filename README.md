@@ -64,7 +64,7 @@ If you're on macOS, run this command:
 
 ```shell
 conda init zsh
-source ~/.zshr
+source ~/.zshrc
 ```
 Then, regardless of platofrm, run the following commmands:
 
